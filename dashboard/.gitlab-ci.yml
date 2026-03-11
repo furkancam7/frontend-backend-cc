@@ -1,0 +1,25 @@
+stages:
+  - build
+  - deploy
+
+build_commander:
+  stage: build
+  image: docker:19.03
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build --cache-from $CI_REGISTRY_IMAGE:prod -t $CI_REGISTRY_IMAGE:prod .
+    - docker push $CI_REGISTRY_IMAGE:prod
+  interruptible: false
+  only:
+    refs:
+      - release
+
+deploy_commander:
+  stage: deploy
+  image: registry.turkai.com/all/docker-images/kubectl
+  script:
+    - kubectl rollout restart -n akn-prod deployment commander-frontend --kubeconfig=$SMARTIDKUBE
+  interruptible: false
+  only:
+    refs:
+      - release

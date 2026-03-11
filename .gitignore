@@ -1,0 +1,36 @@
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+
+# Build / dist
+dist/
+build/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Logs and temp
+*.log
+*.tmp
+
+# Certs and keys (do not commit)
+*.pem
+*.key
+*.crt
+**/docker/certs/
+**/passwd

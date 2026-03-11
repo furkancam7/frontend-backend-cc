@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Drone Mini Map</title>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: #111;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        .mapboxgl-ctrl {
+            display: none !important;
+        }
+
+        .drone-marker {
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+        }
+
+        .drone-body {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 20px;
+            background: #ef4444;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 15px #ef4444;
+            animation: pulse 1s infinite;
+        }
+
+        .drone-arrow {
+            position: absolute;
+            top: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 12px solid #ef4444;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 10px #ef4444;
+            }
+
+            50% {
+                box-shadow: 0 0 25px #ef4444;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="map"></div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
+
+        const params = new URLSearchParams(window.location.search);
+        let lat = parseFloat(params.get('lat')) || 25.6;
+        let lng = parseFloat(params.get('lng')) || 55.9;
+        let heading = parseFloat(params.get('heading')) || 0;
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/satellite-streets-v12',
+            center: [lng, lat],
+            zoom: 15,
+            pitch: 0,
+            attributionControl: false
+        });
+
+        const el = document.createElement('div');
+        el.className = 'drone-marker';
+        el.innerHTML = '<div class="drone-arrow"></div><div class="drone-body"></div>';
+
+        const marker = new mapboxgl.Marker({ element: el })
+            .setLngLat([lng, lat])
+            .addTo(map);
+
+        function update(newLat, newLng, newHeading) {
+            lat = newLat; lng = newLng; heading = newHeading;
+            marker.setLngLat([lng, lat]);
+            el.style.transform = `rotate(${heading}deg)`;
+            map.easeTo({ center: [lng, lat], duration: 300 });
+        }
+
+        window.addEventListener('message', (e) => {
+            if (e.data?.type === 'droneUpdate') {
+                update(e.data.latitude, e.data.longitude, e.data.heading || 0);
+            }
+        });
+
+        setInterval(() => {
+            const p = new URLSearchParams(window.location.search);
+            const newLat = parseFloat(p.get('lat')) || lat;
+            const newLng = parseFloat(p.get('lng')) || lng;
+            const newH = parseFloat(p.get('heading')) || heading;
+            if (newLat !== lat || newLng !== lng || newH !== heading) {
+                update(newLat, newLng, newH);
+            }
+        }, 200);
+    </script>
+</body>
+
+</html>

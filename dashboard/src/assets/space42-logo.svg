@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 70" fill="none">
+  <!-- Background rectangle (Navy Blue) -->
+  <rect x="0" y="10" width="195" height="50" fill="#1B3B6F" rx="1"/>
+  
+  <!-- SPACE text in white -->
+  <text x="15" y="47" font-family="Arial, sans-serif" font-size="26" font-weight="900" fill="white" letter-spacing="2">SPACE</text>
+  
+  <!-- Triangle/Delta symbol (white) - positioned between SPACE and 42 -->
+  <g transform="translate(152, 35)">
+    <path d="M 0 -10 L 10 10 L -10 10 Z" fill="white"/>
+  </g>
+  
+  <!-- 42 text in Navy Blue -->
+  <text x="205" y="47" font-family="Arial, sans-serif" font-size="34" font-weight="900" fill="#1B3B6F">42</text>
+</svg>
