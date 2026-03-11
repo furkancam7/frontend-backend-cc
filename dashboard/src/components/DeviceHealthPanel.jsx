@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
+import InferenceConfigPanel from './InferenceConfigPanel';
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'access', label: 'Access' },
   { id: 'network', label: 'Network' },
   { id: 'config', label: 'Config' },
+  { id: 'inference', label: 'Inference' },
   { id: 'commands', label: 'Commands' },
 ];
 
@@ -92,6 +94,7 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
   const [actionMsg, setActionMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serviceRestartTarget, setServiceRestartTarget] = useState('hub.service');
+  const [managementTick, setManagementTick] = useState(0);
   const refreshTimerRef = useRef(null);
 
   const [configForm, setConfigForm] = useState({
@@ -159,7 +162,7 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
   useEffect(() => {
     if (!selectedId || !onSelectDevice) return;
     if (!selectedDevice && devices[0]) {
-      onSelectDevice(devices[0]);
+      onSelectDevice(devices[0].id);
     }
   }, [selectedId, selectedDevice, devices, onSelectDevice]);
 
@@ -186,6 +189,7 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
           refreshTimerRef.current = setTimeout(() => {
             refreshDevice(selectedId, { silent: true });
           }, 400);
+          setManagementTick(prev => prev + 1);
         } catch {
           // ignore malformed events
         }
@@ -357,6 +361,8 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
                   <KeyValue label="local_ip" value={detail?.local_ip || selectedDevice?.local_ip || networkState.local_ip} />
                   <KeyValue label="tailscale_ip" value={detail?.tailscale_ip || selectedDevice?.tailscale_ip} />
                   <KeyValue label="current_config_version" value={detail?.current_config_version || selectedDevice?.current_config_version} />
+                  <KeyValue label="current_inference_version" value={detail?.current_inference_config_version} />
+                  <KeyValue label="current_inference_status" value={detail?.current_inference_status} />
                 </div>
               </>
             )}
@@ -502,6 +508,16 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
                   </div>
                 </div>
               </>
+            )}
+
+            {activeTab === 'inference' && (
+              <InferenceConfigPanel
+                deviceId={selectedId}
+                deviceStatus={status}
+                mqttOk={detail?.mqtt_ok ?? selectedDevice?.mqtt_ok}
+                isActive={isActive && activeTab === 'inference'}
+                refreshToken={managementTick}
+              />
             )}
 
             {activeTab === 'commands' && (

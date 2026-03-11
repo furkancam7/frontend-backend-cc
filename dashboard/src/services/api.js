@@ -192,6 +192,7 @@ const PATHS = {
   deviceAccessHistory: (id) => `/devices/${id}/access-history`,
   deviceNetworkHistory: (id) => `/devices/${id}/network-history`,
   deviceConfigs: (id) => `/devices/${id}/configs`,
+  deviceInferenceConfig: (id) => `/devices/${id}/inference-config`,
   deviceCommands: (id) => `/devices/${id}/commands`,
   deviceConfigPublish: (id) => `/devices/${id}/config`,
   deviceCommandReboot: (id) => `/devices/${id}/commands/reboot`,
@@ -263,6 +264,37 @@ export const api = {
     return get(`${PATHS.deviceConfigs(deviceId)}?${params}`, { signal, fallback: { success: true, data: { desired: [], applies: [] } } });
   },
 
+  getInferenceConfig: (deviceId, { limit = 20 } = {}, signal) => {
+    const params = new URLSearchParams({ limit });
+    return get(`${PATHS.deviceInferenceConfig(deviceId)}?${params}`, {
+      signal,
+      fallback: {
+        success: true,
+        data: {
+          device_id: deviceId,
+          device: { current_status: 'offline', mqtt_ok: false, last_seen_at: null },
+          current: { source: 'none', is_confirmed: false, settings: {}, container: {}, errors: [] },
+          pending_request: null,
+          history: [],
+          next_config_version: 1,
+          ack_timeout_s: 120,
+          transport: {
+            desired_topic: `devices/${deviceId}/inference/config/desired`,
+            applied_topic: `devices/${deviceId}/inference/config/applied`,
+            broker_host: null,
+            broker_port: null,
+            qos: 1,
+            retain: false,
+            publish_confirm_timeout_s: 2,
+            pending_age_s: null,
+            last_publish_event: null,
+            last_ack_event: null,
+          },
+        },
+      },
+    });
+  },
+
   getDeviceCommands: (deviceId, { limit = 100 } = {}, signal) => {
     const params = new URLSearchParams({ limit });
     return get(`${PATHS.deviceCommands(deviceId)}?${params}`, { signal, fallback: { success: true, data: [] } });
@@ -272,6 +304,9 @@ export const api = {
 
   publishDeviceConfig: (deviceId, data) =>
     post(PATHS.deviceConfigPublish(deviceId), data),
+
+  publishInferenceConfig: (deviceId, data) =>
+    post(PATHS.deviceInferenceConfig(deviceId), data),
 
   sendDeviceRebootCommand: (deviceId, payload = {}) =>
     post(PATHS.deviceCommandReboot(deviceId), { payload }),

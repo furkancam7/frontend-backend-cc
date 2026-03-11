@@ -226,9 +226,21 @@ export default function App() {
 
   const handleSelectDevice = useCallback((device) => {
     if (!device) return;
-    flyToDevice(device);
-    setSelectedDeviceId(device.id);
-  }, [flyToDevice, setSelectedDeviceId]);
+
+    const deviceId = typeof device === 'string'
+      ? device.trim()
+      : (device.id || device.device_id || '').trim();
+    if (!deviceId) return;
+
+    const selectedDevice = typeof device === 'string'
+      ? devices.find(item => item.id === deviceId)
+      : device;
+
+    if (selectedDevice) {
+      flyToDevice(selectedDevice);
+    }
+    setSelectedDeviceId(deviceId);
+  }, [devices, flyToDevice, setSelectedDeviceId]);
 
   const handleOpenDetail = useCallback((recordId) => {
     markPanelMounted('detections');

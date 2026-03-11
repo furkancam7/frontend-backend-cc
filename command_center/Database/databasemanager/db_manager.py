@@ -76,6 +76,7 @@ class DatabaseManager:
             self._remote_network_history = []
             self._remote_configs = []
             self._remote_config_applies = []
+            self._remote_inference_requests = []
             self._remote_commands = []
             self._remote_system_events = []
             logger.info("DatabaseManager running in MOCK mode (no PostgreSQL)")
@@ -978,6 +979,8 @@ class DatabaseManager:
                 self._remote_configs = []
             if not hasattr(self, '_remote_config_applies'):
                 self._remote_config_applies = []
+            if not hasattr(self, '_remote_inference_requests'):
+                self._remote_inference_requests = []
             if not hasattr(self, '_remote_commands'):
                 self._remote_commands = []
             if not hasattr(self, '_remote_system_events'):
@@ -999,6 +1002,13 @@ class DatabaseManager:
                 local_ip                 VARCHAR(64),
                 tailscale_ip             VARCHAR(64),
                 current_config_version   VARCHAR(64),
+                current_inference_config_version INTEGER,
+                current_inference_request_id VARCHAR(128),
+                current_inference_status VARCHAR(32),
+                current_inference_settings_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                current_inference_container_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                last_inference_applied_at TIMESTAMPTZ,
+                last_inference_error_json JSONB,
                 current_access_json      JSONB NOT NULL DEFAULT '{}'::jsonb,
                 current_network_json     JSONB NOT NULL DEFAULT '{}'::jsonb,
                 created_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -1061,6 +1071,36 @@ class DatabaseManager:
         """, fetch=False)
 
         self._execute("""
+            CREATE TABLE IF NOT EXISTS device_inference_config_requests (
+                id                          BIGSERIAL PRIMARY KEY,
+                device_id                   VARCHAR(128) NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
+                request_id                  VARCHAR(128) NOT NULL,
+                config_version              INTEGER NOT NULL,
+                settings_patch_json         JSONB NOT NULL DEFAULT '{}'::jsonb,
+                base_settings_json          JSONB NOT NULL DEFAULT '{}'::jsonb,
+                merged_settings_json        JSONB NOT NULL DEFAULT '{}'::jsonb,
+                request_json                JSONB NOT NULL DEFAULT '{}'::jsonb,
+                request_state               VARCHAR(32) NOT NULL DEFAULT 'pending',
+                ack_status                  VARCHAR(32),
+                applied                     BOOLEAN,
+                created_by                  VARCHAR(128) NOT NULL,
+                created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                ack_received_at             TIMESTAMPTZ,
+                applied_at                  TIMESTAMPTZ,
+                timed_out_at                TIMESTAMPTZ,
+                late_ack                    BOOLEAN NOT NULL DEFAULT FALSE,
+                changed_keys_json           JSONB NOT NULL DEFAULT '[]'::jsonb,
+                errors_json                 JSONB NOT NULL DEFAULT '[]'::jsonb,
+                container_json              JSONB NOT NULL DEFAULT '{}'::jsonb,
+                effective_settings_json     JSONB,
+                raw_ack_json                JSONB,
+                CONSTRAINT uq_inf_req_device_request UNIQUE (device_id, request_id),
+                CONSTRAINT uq_inf_req_device_version UNIQUE (device_id, config_version)
+            )
+        """, fetch=False)
+
+        self._execute("""
             CREATE TABLE IF NOT EXISTS device_commands (
                 id              BIGSERIAL PRIMARY KEY,
                 device_id       VARCHAR(128) NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
@@ -1091,6 +1131,13 @@ class DatabaseManager:
 
         # Backward-compatible adds for already created tables.
         self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS local_ip VARCHAR(64)", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS current_inference_config_version INTEGER", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS current_inference_request_id VARCHAR(128)", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS current_inference_status VARCHAR(32)", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS current_inference_settings_json JSONB NOT NULL DEFAULT '{}'::jsonb", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS current_inference_container_json JSONB NOT NULL DEFAULT '{}'::jsonb", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS last_inference_applied_at TIMESTAMPTZ", fetch=False)
+        self._execute("ALTER TABLE IF EXISTS devices ADD COLUMN IF NOT EXISTS last_inference_error_json JSONB", fetch=False)
         self._execute("ALTER TABLE IF EXISTS device_network_states ADD COLUMN IF NOT EXISTS local_ip VARCHAR(64)", fetch=False)
 
         self._execute(
@@ -1111,6 +1158,14 @@ class DatabaseManager:
         )
         self._execute(
             "CREATE INDEX IF NOT EXISTS idx_rm_config_apply_device_created ON device_config_applies(device_id, created_at DESC)",
+            fetch=False
+        )
+        self._execute(
+            "CREATE INDEX IF NOT EXISTS idx_inf_req_device_created ON device_inference_config_requests(device_id, created_at DESC)",
+            fetch=False
+        )
+        self._execute(
+            "CREATE INDEX IF NOT EXISTS idx_inf_req_device_pending ON device_inference_config_requests(device_id, updated_at DESC) WHERE request_state = 'pending'",
             fetch=False
         )
         self._execute(
@@ -1142,6 +1197,13 @@ class DatabaseManager:
             'local_ip': None,
             'tailscale_ip': None,
             'current_config_version': None,
+            'current_inference_config_version': None,
+            'current_inference_request_id': None,
+            'current_inference_status': None,
+            'current_inference_settings_json': {},
+            'current_inference_container_json': {},
+            'last_inference_applied_at': None,
+            'last_inference_error_json': None,
             'current_access_json': {},
             'current_network_json': {},
             'created_at': now_iso,
@@ -1207,12 +1269,18 @@ class DatabaseManager:
             INSERT INTO devices (
                 device_id, hostname, last_seen_at, current_status, mqtt_ok, tailscale_ok,
                 reverse_tunnel_ok, ssh_ready, primary_interface, public_egress_ip, local_ip,
-                tailscale_ip, current_config_version, current_access_json, current_network_json
+                tailscale_ip, current_config_version, current_inference_config_version,
+                current_inference_request_id, current_inference_status,
+                current_inference_settings_json, current_inference_container_json,
+                last_inference_applied_at, last_inference_error_json,
+                current_access_json, current_network_json
             )
             VALUES (
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
-                %s, %s, %s::jsonb, %s::jsonb
+                %s, %s, %s, %s, %s,
+                %s::jsonb, %s::jsonb, %s, %s::jsonb,
+                %s::jsonb, %s::jsonb
             )
             ON CONFLICT (device_id) DO UPDATE SET
                 hostname = EXCLUDED.hostname,
@@ -1227,6 +1295,13 @@ class DatabaseManager:
                 local_ip = EXCLUDED.local_ip,
                 tailscale_ip = EXCLUDED.tailscale_ip,
                 current_config_version = EXCLUDED.current_config_version,
+                current_inference_config_version = EXCLUDED.current_inference_config_version,
+                current_inference_request_id = EXCLUDED.current_inference_request_id,
+                current_inference_status = EXCLUDED.current_inference_status,
+                current_inference_settings_json = EXCLUDED.current_inference_settings_json,
+                current_inference_container_json = EXCLUDED.current_inference_container_json,
+                last_inference_applied_at = EXCLUDED.last_inference_applied_at,
+                last_inference_error_json = EXCLUDED.last_inference_error_json,
                 current_access_json = EXCLUDED.current_access_json,
                 current_network_json = EXCLUDED.current_network_json,
                 updated_at = NOW()
@@ -1245,12 +1320,22 @@ class DatabaseManager:
             merged.get('local_ip'),
             merged.get('tailscale_ip'),
             merged.get('current_config_version'),
+            merged.get('current_inference_config_version'),
+            merged.get('current_inference_request_id'),
+            merged.get('current_inference_status'),
+            json.dumps(merged.get('current_inference_settings_json') or {}),
+            json.dumps(merged.get('current_inference_container_json') or {}),
+            self._parse_datetime(merged.get('last_inference_applied_at'), default_now=False),
+            json.dumps(merged.get('last_inference_error_json') or []),
             json.dumps(merged.get('current_access_json') or {}),
             json.dumps(merged.get('current_network_json') or {}),
         ))
         if not result:
             return None
-        return self._normalize_row_datetimes(result[0], ['last_seen_at', 'created_at', 'updated_at'])
+        return self._normalize_row_datetimes(
+            result[0],
+            ['last_seen_at', 'last_inference_applied_at', 'created_at', 'updated_at']
+        )
 
     def get_remote_device(self, device_id: str) -> Optional[Dict]:
         if not device_id:
@@ -1269,7 +1354,10 @@ class DatabaseManager:
         result = self._execute("SELECT * FROM devices WHERE device_id = %s", (device_id,))
         if not result:
             return None
-        row = self._normalize_row_datetimes(result[0], ['last_seen_at', 'created_at', 'updated_at'])
+        row = self._normalize_row_datetimes(
+            result[0],
+            ['last_seen_at', 'last_inference_applied_at', 'created_at', 'updated_at']
+        )
         if row.get('current_status') != 'error':
             derived = self.derive_remote_status(row)
             if row.get('current_status') != derived:
@@ -1298,7 +1386,10 @@ class DatabaseManager:
             return []
         rows = []
         for raw in result:
-            row = self._normalize_row_datetimes(raw, ['last_seen_at', 'created_at', 'updated_at'])
+            row = self._normalize_row_datetimes(
+                raw,
+                ['last_seen_at', 'last_inference_applied_at', 'created_at', 'updated_at']
+            )
             if row.get('current_status') != 'error':
                 row['current_status'] = self.derive_remote_status(row)
             rows.append(row)
@@ -1624,7 +1715,7 @@ class DatabaseManager:
         self._upsert_remote_device(device_id, {'last_seen_at': datetime.now(timezone.utc)})
         return updated_row
 
-    def record_system_event(self, payload: Dict) -> Optional[Dict]:
+    def record_system_event(self, payload: Dict, touch_last_seen: bool = True) -> Optional[Dict]:
         device_id = payload.get('device_id')
         if not device_id:
             return None
@@ -1669,7 +1760,8 @@ class DatabaseManager:
             ))
             inserted = self._normalize_row_datetimes(result[0], ['event_at', 'created_at']) if result else None
 
-        self._upsert_remote_device(device_id, {'last_seen_at': datetime.now(timezone.utc)})
+        if touch_last_seen:
+            self._upsert_remote_device(device_id, {'last_seen_at': datetime.now(timezone.utc)})
         return inserted
 
     def mark_remote_device_error(self, device_id: str, message: str) -> Optional[Dict]:
@@ -1770,6 +1862,510 @@ class DatabaseManager:
         if not result:
             return []
         return [self._normalize_row_datetimes(row, ['applied_at', 'created_at']) for row in result]
+
+    def _normalize_inference_request_row(self, row: Optional[Dict]) -> Optional[Dict]:
+        if not row:
+            return None
+        return self._normalize_row_datetimes(
+            dict(row),
+            ['created_at', 'updated_at', 'ack_received_at', 'applied_at', 'timed_out_at']
+        )
+
+    def get_inference_config_request(self, device_id: str, request_id: str) -> Optional[Dict]:
+        self._ensure_remote_management_tables()
+        if not device_id or not request_id:
+            return None
+
+        if self.use_mock:
+            for row in reversed(self._remote_inference_requests):
+                if row.get('device_id') == device_id and row.get('request_id') == request_id:
+                    return self._normalize_inference_request_row(row)
+            return None
+
+        result = self._execute("""
+            SELECT *
+            FROM device_inference_config_requests
+            WHERE device_id = %s AND request_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (device_id, request_id))
+        if not result:
+            return None
+        return self._normalize_inference_request_row(result[0])
+
+    def retry_inference_config_request(self, device_id: str, request_id: str) -> Optional[Dict]:
+        self._ensure_remote_management_tables()
+        if not device_id or not request_id:
+            return None
+
+        if self.use_mock:
+            for row in reversed(self._remote_inference_requests):
+                if row.get('device_id') == device_id and row.get('request_id') == request_id:
+                    row['request_state'] = 'pending'
+                    row['ack_status'] = None
+                    row['applied'] = None
+                    row['ack_received_at'] = None
+                    row['applied_at'] = None
+                    row['timed_out_at'] = None
+                    row['late_ack'] = False
+                    row['errors_json'] = []
+                    row['container_json'] = {}
+                    row['effective_settings_json'] = None
+                    row['raw_ack_json'] = None
+                    row['updated_at'] = datetime.now(timezone.utc).isoformat()
+                    return self._normalize_inference_request_row(row)
+            return None
+
+        result = self._execute("""
+            UPDATE device_inference_config_requests
+            SET request_state = 'pending',
+                ack_status = NULL,
+                applied = NULL,
+                ack_received_at = NULL,
+                applied_at = NULL,
+                timed_out_at = NULL,
+                late_ack = FALSE,
+                errors_json = '[]'::jsonb,
+                container_json = '{}'::jsonb,
+                effective_settings_json = NULL,
+                raw_ack_json = NULL,
+                updated_at = NOW()
+            WHERE device_id = %s AND request_id = %s
+            RETURNING *
+        """, (device_id, request_id))
+        if not result:
+            return None
+        return self._normalize_inference_request_row(result[0])
+
+    def record_inference_config_desired(
+        self,
+        device_id: str,
+        request_id: str,
+        config_version: int,
+        settings_patch_json: Dict,
+        base_settings_json: Dict,
+        merged_settings_json: Dict,
+        request_json: Dict,
+        created_by: str,
+    ) -> Optional[Dict]:
+        if not device_id or not request_id or config_version is None:
+            return None
+
+        self._ensure_remote_management_tables()
+        self._upsert_remote_device(device_id, {})
+
+        row = {
+            'device_id': device_id,
+            'request_id': request_id,
+            'config_version': int(config_version),
+            'settings_patch_json': settings_patch_json or {},
+            'base_settings_json': base_settings_json or {},
+            'merged_settings_json': merged_settings_json or {},
+            'request_json': request_json or {},
+            'request_state': 'pending',
+            'ack_status': None,
+            'applied': None,
+            'created_by': created_by or 'unknown',
+            'created_at': datetime.now(timezone.utc).isoformat(),
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+            'ack_received_at': None,
+            'applied_at': None,
+            'timed_out_at': None,
+            'late_ack': False,
+            'changed_keys_json': list((settings_patch_json or {}).keys()),
+            'errors_json': [],
+            'container_json': {},
+            'effective_settings_json': None,
+            'raw_ack_json': None,
+        }
+
+        if self.use_mock:
+            mock_row = dict(row)
+            mock_row['id'] = self._next_mock_id(self._remote_inference_requests)
+            self._remote_inference_requests.append(mock_row)
+            self._upsert_remote_device(device_id, {
+                'current_inference_request_id': request_id,
+                'current_inference_status': 'pending',
+                'last_inference_error_json': [],
+            })
+            return self._normalize_inference_request_row(mock_row)
+
+        result = self._execute("""
+            INSERT INTO device_inference_config_requests (
+                device_id, request_id, config_version, settings_patch_json, base_settings_json,
+                merged_settings_json, request_json, request_state, created_by, changed_keys_json
+            ) VALUES (%s, %s, %s, %s::jsonb, %s::jsonb, %s::jsonb, %s::jsonb, 'pending', %s, %s::jsonb)
+            RETURNING *
+        """, (
+            device_id,
+            request_id,
+            int(config_version),
+            json.dumps(settings_patch_json or {}),
+            json.dumps(base_settings_json or {}),
+            json.dumps(merged_settings_json or {}),
+            json.dumps(request_json or {}),
+            created_by or 'unknown',
+            json.dumps(list((settings_patch_json or {}).keys())),
+        ))
+        if not result:
+            return None
+
+        self._upsert_remote_device(device_id, {
+            'current_inference_request_id': request_id,
+            'current_inference_status': 'pending',
+            'last_inference_error_json': [],
+        })
+        return self._normalize_inference_request_row(result[0])
+
+    def record_inference_config_publish_failed(
+        self,
+        device_id: str,
+        request_id: str,
+        error_message: str,
+        payload: Optional[Dict] = None,
+    ) -> Optional[Dict]:
+        self._ensure_remote_management_tables()
+        if not device_id or not request_id:
+            return None
+
+        if self.use_mock:
+            updated = None
+            for row in reversed(self._remote_inference_requests):
+                if row.get('device_id') == device_id and row.get('request_id') == request_id:
+                    row['request_state'] = 'publish_failed'
+                    row['errors_json'] = [error_message] if error_message else []
+                    row['updated_at'] = datetime.now(timezone.utc).isoformat()
+                    updated = dict(row)
+                    break
+            if not updated:
+                return None
+            self._upsert_remote_device(device_id, {
+                'current_inference_request_id': request_id,
+                'current_inference_status': 'publish_failed',
+                'last_inference_error_json': [error_message] if error_message else [],
+            })
+            event_payload = dict(payload or {})
+            event_payload.setdefault('request_id', request_id)
+            self.record_system_event({
+                'device_id': device_id,
+                'event_type': 'inference_config_publish_failed',
+                'severity': 'error',
+                'message': error_message,
+                'payload': event_payload,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            }, touch_last_seen=False)
+            return self._normalize_inference_request_row(updated)
+
+        result = self._execute("""
+            UPDATE device_inference_config_requests
+            SET request_state = 'publish_failed',
+                errors_json = %s::jsonb,
+                updated_at = NOW()
+            WHERE device_id = %s AND request_id = %s
+            RETURNING *
+        """, (
+            json.dumps([error_message] if error_message else []),
+            device_id,
+            request_id,
+        ))
+        if not result:
+            return None
+
+        self._upsert_remote_device(device_id, {
+            'current_inference_request_id': request_id,
+            'current_inference_status': 'publish_failed',
+            'last_inference_error_json': [error_message] if error_message else [],
+        })
+        event_payload = dict(payload or {})
+        event_payload.setdefault('request_id', request_id)
+        self.record_system_event({
+            'device_id': device_id,
+            'event_type': 'inference_config_publish_failed',
+            'severity': 'error',
+            'message': error_message,
+            'payload': event_payload,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }, touch_last_seen=False)
+        return self._normalize_inference_request_row(result[0])
+
+    def record_inference_config_applied(self, payload: Dict) -> Optional[Dict]:
+        self._ensure_remote_management_tables()
+        device_id = payload.get('device_id')
+        request_id = payload.get('request_id')
+        if not device_id or not request_id:
+            return None
+
+        self._upsert_remote_device(device_id, {})
+        existing = self.get_inference_config_request(device_id, request_id)
+        if not existing:
+            return None
+
+        applied_at = self._parse_datetime(payload.get('applied_at'))
+        late_ack = existing.get('request_state') == 'timed_out'
+        errors = payload.get('errors') if payload.get('errors') is not None else []
+        changed_keys = payload.get('changed_keys') if payload.get('changed_keys') is not None else []
+        container = payload.get('container') if isinstance(payload.get('container'), dict) else {}
+        effective_settings = payload.get('effective_settings') if isinstance(payload.get('effective_settings'), dict) else {}
+        status = payload.get('status')
+        applied = payload.get('applied')
+        raw_json = payload.get('raw_json') or payload
+
+        if self.use_mock:
+            updated = None
+            for row in reversed(self._remote_inference_requests):
+                if row.get('device_id') == device_id and row.get('request_id') == request_id:
+                    row['request_state'] = 'finalized'
+                    row['ack_status'] = status
+                    row['applied'] = applied
+                    row['ack_received_at'] = datetime.now(timezone.utc).isoformat()
+                    row['applied_at'] = applied_at.isoformat()
+                    row['late_ack'] = late_ack
+                    row['changed_keys_json'] = changed_keys
+                    row['errors_json'] = errors
+                    row['container_json'] = container
+                    row['effective_settings_json'] = effective_settings or None
+                    row['raw_ack_json'] = raw_json
+                    row['updated_at'] = datetime.now(timezone.utc).isoformat()
+                    updated = dict(row)
+                    break
+            if not updated:
+                return None
+        else:
+            result = self._execute("""
+                UPDATE device_inference_config_requests
+                SET request_state = 'finalized',
+                    ack_status = %s,
+                    applied = %s,
+                    ack_received_at = NOW(),
+                    applied_at = %s,
+                    late_ack = %s,
+                    changed_keys_json = %s::jsonb,
+                    errors_json = %s::jsonb,
+                    container_json = %s::jsonb,
+                    effective_settings_json = %s::jsonb,
+                    raw_ack_json = %s::jsonb,
+                    updated_at = NOW()
+                WHERE device_id = %s AND request_id = %s
+                RETURNING *
+            """, (
+                status,
+                applied,
+                applied_at,
+                late_ack,
+                json.dumps(changed_keys),
+                json.dumps(errors),
+                json.dumps(container),
+                json.dumps(effective_settings or {}),
+                json.dumps(raw_json),
+                device_id,
+                request_id,
+            ))
+            if not result:
+                return None
+            updated = result[0]
+
+        device_updates = {
+            'current_inference_request_id': request_id,
+            'current_inference_status': status,
+            'last_inference_error_json': errors,
+            'last_seen_at': datetime.now(timezone.utc),
+        }
+        if status in {'applied', 'rolled_back'}:
+            device_updates.update({
+                'current_inference_config_version': int(payload.get('config_version')),
+                'current_inference_settings_json': effective_settings,
+                'current_inference_container_json': container,
+                'last_inference_applied_at': applied_at.isoformat(),
+            })
+        self._upsert_remote_device(device_id, device_updates)
+
+        if status != 'applied':
+            severity = 'warning' if status in {'duplicate', 'rolled_back'} else 'error'
+            self.record_system_event({
+                'device_id': device_id,
+                'event_type': f'inference_config_{status}',
+                'severity': severity,
+                'message': f'Inference config {status}',
+                'payload': raw_json,
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+
+        return self._normalize_inference_request_row(updated)
+
+    def mark_timed_out_inference_requests(self, timeout_seconds: int = 120) -> List[Dict]:
+        self._ensure_remote_management_tables()
+        timeout_seconds = max(1, int(timeout_seconds))
+        timed_out_rows = []
+
+        if self.use_mock:
+            now = datetime.now(timezone.utc)
+            for row in self._remote_inference_requests:
+                if row.get('request_state') != 'pending':
+                    continue
+                created_at = self._parse_datetime(row.get('created_at'))
+                if not created_at or (now - created_at).total_seconds() < timeout_seconds:
+                    continue
+                row['request_state'] = 'timed_out'
+                row['timed_out_at'] = now.isoformat()
+                row['updated_at'] = now.isoformat()
+                timed_out_rows.append(dict(row))
+        else:
+            result = self._execute("""
+                UPDATE device_inference_config_requests
+                SET request_state = 'timed_out',
+                    timed_out_at = NOW(),
+                    updated_at = NOW()
+                WHERE request_state = 'pending'
+                  AND created_at <= NOW() - (%s * INTERVAL '1 second')
+                RETURNING *
+            """, (timeout_seconds,))
+            timed_out_rows = result or []
+
+        normalized_rows = []
+        for row in timed_out_rows:
+            normalized = self._normalize_inference_request_row(row)
+            normalized_rows.append(normalized)
+            self._upsert_remote_device(normalized.get('device_id'), {
+                'current_inference_request_id': normalized.get('request_id'),
+                'current_inference_status': 'timed_out',
+                'last_inference_error_json': ['Timed out waiting for device ACK'],
+            })
+            self.record_system_event({
+                'device_id': normalized.get('device_id'),
+                'event_type': 'inference_config_timed_out',
+                'severity': 'warning',
+                'message': 'Inference config request timed out waiting for ACK',
+                'payload': {
+                    'request_id': normalized.get('request_id'),
+                    'config_version': normalized.get('config_version'),
+                },
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+            })
+        return normalized_rows
+
+    def get_pending_inference_request(self, device_id: str) -> Optional[Dict]:
+        self._ensure_remote_management_tables()
+        if not device_id:
+            return None
+
+        if self.use_mock:
+            pending_rows = [
+                row for row in self._remote_inference_requests
+                if row.get('device_id') == device_id and row.get('request_state') == 'pending'
+            ]
+            pending_rows.sort(key=lambda item: item.get('created_at') or '', reverse=True)
+            return self._normalize_inference_request_row(pending_rows[0]) if pending_rows else None
+
+        result = self._execute("""
+            SELECT *
+            FROM device_inference_config_requests
+            WHERE device_id = %s AND request_state = 'pending'
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (device_id,))
+        if not result:
+            return None
+        return self._normalize_inference_request_row(result[0])
+
+    def get_inference_config_history(self, device_id: str, limit: int = 20) -> List[Dict]:
+        self._ensure_remote_management_tables()
+        limit = max(1, min(int(limit), 200))
+
+        if self.use_mock:
+            rows = [dict(r) for r in self._remote_inference_requests if r.get('device_id') == device_id]
+            rows.sort(key=lambda r: r.get('created_at') or '', reverse=True)
+            return [self._normalize_inference_request_row(row) for row in rows[:limit]]
+
+        result = self._execute("""
+            SELECT *
+            FROM device_inference_config_requests
+            WHERE device_id = %s
+            ORDER BY created_at DESC
+            LIMIT %s
+        """, (device_id, limit))
+        if not result:
+            return []
+        return [self._normalize_inference_request_row(row) for row in result]
+
+    def get_inference_config_summary(self, device_id: str, limit: int = 20) -> Dict:
+        self._ensure_remote_management_tables()
+        history = self.get_inference_config_history(device_id, limit=limit)
+        pending_request = self.get_pending_inference_request(device_id)
+        device = self.get_remote_device(device_id) or self._default_remote_device(device_id)
+
+        if self.use_mock:
+            max_version = 0
+            for row in self._remote_inference_requests:
+                if row.get('device_id') == device_id:
+                    max_version = max(max_version, int(row.get('config_version') or 0))
+        else:
+            max_result = self._execute("""
+                SELECT COALESCE(MAX(config_version), 0) AS max_version
+                FROM device_inference_config_requests
+                WHERE device_id = %s
+            """, (device_id,))
+            max_version = int((max_result or [{'max_version': 0}])[0].get('max_version') or 0)
+
+        max_version = max(max_version, int(device.get('current_inference_config_version') or 0))
+
+        current_settings = device.get('current_inference_settings_json') or {}
+        has_confirmed = (
+            device.get('current_inference_config_version') is not None
+            or bool(current_settings)
+            or bool(device.get('last_inference_applied_at'))
+        )
+
+        if has_confirmed:
+            current = {
+                'source': 'effective',
+                'is_confirmed': True,
+                'request_id': device.get('current_inference_request_id'),
+                'config_version': device.get('current_inference_config_version'),
+                'status': device.get('current_inference_status') or 'applied',
+                'settings': current_settings,
+                'container': device.get('current_inference_container_json') or {},
+                'applied_at': device.get('last_inference_applied_at'),
+                'errors': device.get('last_inference_error_json') or [],
+            }
+        elif history:
+            latest = history[0]
+            current = {
+                'source': 'draft_desired',
+                'is_confirmed': False,
+                'request_id': latest.get('request_id'),
+                'config_version': latest.get('config_version'),
+                'status': latest.get('ack_status') or latest.get('request_state'),
+                'settings': latest.get('merged_settings_json') or {},
+                'container': latest.get('container_json') or {},
+                'applied_at': latest.get('applied_at'),
+                'errors': latest.get('errors_json') or [],
+            }
+        else:
+            current = {
+                'source': 'none',
+                'is_confirmed': False,
+                'request_id': None,
+                'config_version': None,
+                'status': None,
+                'settings': {},
+                'container': {},
+                'applied_at': None,
+                'errors': [],
+            }
+
+        return {
+            'device_id': device_id,
+            'device': {
+                'device_id': device_id,
+                'current_status': device.get('current_status') or 'offline',
+                'mqtt_ok': device.get('mqtt_ok'),
+                'last_seen_at': device.get('last_seen_at'),
+            },
+            'current': current,
+            'pending_request': pending_request,
+            'history': history,
+            'next_config_version': max(max_version + 1, 1),
+        }
 
     def get_device_commands(self, device_id: str, limit: int = 100) -> List[Dict]:
         self._ensure_remote_management_tables()

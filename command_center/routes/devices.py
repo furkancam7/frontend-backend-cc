@@ -1,4 +1,5 @@
 import json
+import importlib.util
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
@@ -7,7 +8,20 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+_config_spec = importlib.util.spec_from_file_location(
+    "config_module",
+    os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.py"),
+)
+_config_module = importlib.util.module_from_spec(_config_spec)
+_config_spec.loader.exec_module(_config_module)
+config = _config_module.config
 from Database.authentication.auth import get_current_active_user
+from mqtt.inference_config import (
+    InferenceDesiredRequest,
+    build_inference_applied_topic,
+    build_inference_desired_topic,
+    merge_inference_settings,
+)
 from mqtt.remote_management import SUPPORTED_COMMAND_TYPES
 from mqtt.utils import get_mqtt_client
 from routes.utils import (
@@ -64,6 +78,51 @@ def _parse_dt(value):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _latest_timestamp(*values):
+    latest_dt = None
+    latest_value = None
+    for value in values:
+        parsed = _parse_dt(value)
+        if parsed and (latest_dt is None or parsed > latest_dt):
+            latest_dt = parsed
+            latest_value = value.isoformat() if isinstance(value, datetime) else value
+    return latest_value
+
+
+def _resolve_effective_status(remote: Optional[Dict], legacy: Optional[Dict]) -> str:
+    remote = remote or {}
+    legacy = legacy or {}
+
+    remote_status = remote.get("current_status")
+    legacy_status = legacy.get("status")
+
+    if remote_status == "error":
+        return "error"
+
+    # Heartbeat freshness is a stronger signal for MQTT reachability than stale
+    # remote-management snapshots, so let it override an aged-out remote status.
+    if legacy_status == "online":
+        if remote_status in {"online", "degraded"}:
+            return remote_status
+        return "online"
+
+    return remote_status or legacy_status or "offline"
+
+
+def _resolve_effective_mqtt_ok(remote: Optional[Dict], legacy: Optional[Dict], status: str):
+    remote = remote or {}
+    legacy = legacy or {}
+
+    mqtt_ok = remote.get("mqtt_ok")
+    if mqtt_ok is not None:
+        return mqtt_ok
+
+    if status in {"online", "degraded"} and legacy.get("last_heartbeat_at"):
+        return True
+
+    return None
 
 
 def _build_legacy_devices(db) -> List[Dict]:
@@ -154,10 +213,11 @@ def _compose_device_view(remote: Optional[Dict], legacy: Optional[Dict]) -> Dict
     access_state = remote.get("current_access_json") or {}
     network_state = remote.get("current_network_json") or {}
 
-    status = (
-        remote.get("current_status")
-        or legacy.get("status")
-        or "offline"
+    status = _resolve_effective_status(remote, legacy)
+    mqtt_ok = _resolve_effective_mqtt_ok(remote, legacy, status)
+    last_seen_at = _latest_timestamp(
+        remote.get("last_seen_at"),
+        legacy.get("last_heartbeat_at"),
     )
 
     return {
@@ -167,11 +227,11 @@ def _compose_device_view(remote: Optional[Dict], legacy: Optional[Dict]) -> Dict
         "last_known_location": legacy.get("last_known_location"),
         "status": status,
         "current_status": status,
-        "last_seen_at": remote.get("last_seen_at"),
+        "last_seen_at": last_seen_at,
         "last_detection": legacy.get("last_detection"),
         "last_heartbeat_at": legacy.get("last_heartbeat_at"),
         "direction": legacy.get("direction"),
-        "mqtt_ok": remote.get("mqtt_ok"),
+        "mqtt_ok": mqtt_ok,
         "tailscale_ok": remote.get("tailscale_ok"),
         "reverse_tunnel_ok": remote.get("reverse_tunnel_ok"),
         "ssh_ready": remote.get("ssh_ready"),
@@ -180,6 +240,10 @@ def _compose_device_view(remote: Optional[Dict], legacy: Optional[Dict]) -> Dict
         "local_ip": remote.get("local_ip") or network_state.get("local_ip"),
         "tailscale_ip": remote.get("tailscale_ip") or network_state.get("tailscale_ip"),
         "current_config_version": remote.get("current_config_version"),
+        "current_inference_config_version": remote.get("current_inference_config_version"),
+        "current_inference_request_id": remote.get("current_inference_request_id"),
+        "current_inference_status": remote.get("current_inference_status"),
+        "last_inference_applied_at": remote.get("last_inference_applied_at"),
         "access_state": access_state,
         "network_state": network_state,
         "heartbeat_settings": legacy.get("heartbeat_settings"),
@@ -208,15 +272,64 @@ def _build_devices_for_response(db) -> List[Dict]:
     return merged
 
 
-def _mqtt_publish(topic: str, payload: Dict):
+def _mqtt_client_id(client) -> str:
+    client_id = getattr(client, "_client_id", "")
+    if isinstance(client_id, (bytes, bytearray)):
+        return client_id.decode("utf-8", errors="replace")
+    return str(client_id or "")
+
+
+def _mqtt_publish(
+    topic: str,
+    payload: Dict,
+    *,
+    qos: int = 1,
+    retain: bool = False,
+    require_confirm: bool = False,
+    confirm_timeout_s: Optional[int] = None,
+) -> Dict:
     client = get_mqtt_client()
     if not client:
         raise HTTPException(status_code=503, detail="MQTT client is not available")
 
+    client_connected = bool(getattr(client, "is_connected", lambda: False)())
+    publish_meta = {
+        "topic": topic,
+        "broker_host": config.MQTT_BROKER,
+        "broker_port": config.MQTT_PORT,
+        "qos": qos,
+        "retain": retain,
+        "client_id": _mqtt_client_id(client),
+        "client_connected": client_connected,
+        "publish_confirm_timeout_s": confirm_timeout_s,
+    }
+    if not client_connected:
+        exc = HTTPException(status_code=503, detail="MQTT client is not connected")
+        exc.publish_metadata = publish_meta
+        raise exc
+
     message = json.dumps(payload)
-    info = client.publish(topic, payload=message, qos=1)
+    info = client.publish(topic, payload=message, qos=qos, retain=retain)
+    publish_meta["rc"] = getattr(info, "rc", None)
+    publish_meta["mid"] = getattr(info, "mid", None)
+    publish_meta["published"] = bool(getattr(info, "is_published", lambda: False)())
     if getattr(info, "rc", 0) != 0:
-        raise HTTPException(status_code=502, detail=f"Failed to publish MQTT message to {topic}")
+        exc = HTTPException(status_code=502, detail=f"Failed to publish MQTT message to {topic}")
+        exc.publish_metadata = publish_meta
+        raise exc
+
+    if require_confirm:
+        timeout = confirm_timeout_s if confirm_timeout_s is not None else config.MQTT_PUBLISH_CONFIRM_TIMEOUT_SEC
+        waiter = getattr(info, "wait_for_publish", None)
+        if callable(waiter):
+            waiter(timeout)
+        publish_meta["published"] = bool(getattr(info, "is_published", lambda: False)())
+        if not publish_meta["published"]:
+            exc = HTTPException(status_code=502, detail=f"Broker publish confirmation timed out for {topic}")
+            exc.publish_metadata = publish_meta
+            raise exc
+
+    return publish_meta
 
 
 def _notify_remote_ws(event: Dict):
@@ -225,6 +338,106 @@ def _notify_remote_ws(event: Dict):
         notify_remote_management_update(event)
     except Exception as e:
         logger.warning(f"Remote websocket notify failed: {e}")
+
+
+def _sweep_inference_timeouts(db):
+    rows = db.mark_timed_out_inference_requests(config.INFERENCE_CONFIG_ACK_TIMEOUT_SEC)
+    for row in rows:
+        _notify_remote_ws({
+            "event_type": "inference_config_timeout",
+            "device_id": row.get("device_id"),
+            "data": row,
+            "received_at": datetime.now(timezone.utc).isoformat(),
+        })
+    return rows
+
+
+def _find_latest_system_event(db, device_id: str, event_types: List[str], limit: int = 25) -> Optional[Dict]:
+    try:
+        rows = db.get_system_events(device_id, limit=limit)
+    except Exception:
+        return None
+
+    allowed = set(event_types)
+    return next((row for row in rows if row.get("event_type") in allowed), None)
+
+
+def _build_inference_ack_event(summary: Dict, device_id: str) -> Optional[Dict]:
+    for row in summary.get("history") or []:
+        if row.get("ack_received_at"):
+            return {
+                "request_id": row.get("request_id"),
+                "config_version": row.get("config_version"),
+                "ack_status": row.get("ack_status"),
+                "applied": row.get("applied"),
+                "ack_received_at": row.get("ack_received_at"),
+                "applied_at": row.get("applied_at"),
+                "late_ack": row.get("late_ack"),
+                "errors": row.get("errors_json") or [],
+                "topic": build_inference_applied_topic(device_id),
+            }
+    return None
+
+
+def _build_inference_transport(db, device_id: str, summary: Dict) -> Dict:
+    pending_request = summary.get("pending_request") or {}
+    pending_created_at = _parse_dt(pending_request.get("created_at"))
+    pending_age_s = None
+    if pending_created_at:
+        pending_age_s = max(0, int((datetime.now(timezone.utc) - pending_created_at).total_seconds()))
+
+    return {
+        "desired_topic": build_inference_desired_topic(device_id),
+        "applied_topic": build_inference_applied_topic(device_id),
+        "broker_host": config.MQTT_BROKER,
+        "broker_port": config.MQTT_PORT,
+        "qos": 1,
+        "retain": False,
+        "publish_confirm_timeout_s": config.MQTT_PUBLISH_CONFIRM_TIMEOUT_SEC,
+        "pending_age_s": pending_age_s,
+        "last_publish_event": _find_latest_system_event(
+            db,
+            device_id,
+            ["inference_config_publish_confirmed", "inference_config_publish_failed"],
+        ),
+        "last_ack_event": _build_inference_ack_event(summary, device_id),
+    }
+
+
+def _build_inference_config_response(db, device_id: str, limit: int = 20) -> Dict:
+    summary = db.get_inference_config_summary(device_id, limit=limit)
+    try:
+        device_view = next(
+            (item for item in _build_devices_for_response(db) if item.get("device_id") == device_id),
+            None,
+        )
+    except Exception:
+        device_view = None
+
+    if device_view:
+        summary["device"] = {
+            **(summary.get("device") or {}),
+            "device_id": device_id,
+            "current_status": device_view.get("current_status") or device_view.get("status") or "offline",
+            "mqtt_ok": device_view.get("mqtt_ok"),
+            "last_seen_at": device_view.get("last_seen_at") or (summary.get("device") or {}).get("last_seen_at"),
+            "last_heartbeat_at": device_view.get("last_heartbeat_at"),
+        }
+    summary["ack_timeout_s"] = config.INFERENCE_CONFIG_ACK_TIMEOUT_SEC
+    summary["transport"] = _build_inference_transport(db, device_id, summary)
+    return summary
+
+
+def _publish_inference_config(device_id: str, payload: Dict) -> Dict:
+    topic = build_inference_desired_topic(device_id)
+    return _mqtt_publish(
+        topic,
+        payload,
+        qos=1,
+        retain=False,
+        require_confirm=True,
+        confirm_timeout_s=config.MQTT_PUBLISH_CONFIRM_TIMEOUT_SEC,
+    )
 
 
 def _issue_command(db, device_id: str, command_type: str, payload: Dict, issued_by: str):
@@ -427,6 +640,174 @@ async def get_device_detail(device_id: str, current_user=Depends(get_current_act
         raise
     except Exception as e:
         logger.error(f"Get device detail error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/devices/{device_id}/inference-config", response_model=dict)
+async def get_inference_config(
+    device_id: str,
+    limit: int = Query(20, ge=1, le=200),
+    current_user=Depends(get_current_active_user),
+):
+    db = get_db()
+    try:
+        _sweep_inference_timeouts(db)
+        summary = _build_inference_config_response(db, device_id, limit=limit)
+        return {"success": True, "data": summary}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Get inference config error: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/devices/{device_id}/inference-config", response_model=dict)
+async def post_inference_config(
+    device_id: str,
+    body: InferenceDesiredRequest,
+    current_user=Depends(get_current_active_user),
+):
+    db = get_db()
+    try:
+        _sweep_inference_timeouts(db)
+        summary = _build_inference_config_response(db, device_id, limit=20)
+        device_state = summary.get("device") or {}
+
+        if device_state.get("current_status") in {"offline", "error"} or device_state.get("mqtt_ok") is False:
+            raise HTTPException(status_code=409, detail="Device is offline or MQTT unavailable")
+
+        base_settings = ((summary.get("current") or {}).get("settings") or {})
+        patch_settings = body.settings.model_dump(exclude_none=True)
+        changed_settings = {
+            key: value
+            for key, value in patch_settings.items()
+            if base_settings.get(key) != value
+        }
+        if not changed_settings:
+            raise HTTPException(status_code=422, detail="No settings changes to publish")
+
+        request_payload = {
+            "request_id": body.request_id,
+            "config_version": body.config_version,
+            "settings": changed_settings,
+        }
+        publish_context = {
+            "device_id": device_id,
+            "request_id": body.request_id,
+            "config_version": body.config_version,
+            "desired_topic": build_inference_desired_topic(device_id),
+            "applied_topic": build_inference_applied_topic(device_id),
+            "broker_host": config.MQTT_BROKER,
+            "broker_port": config.MQTT_PORT,
+            "qos": 1,
+            "retain": False,
+            "publish_confirm_timeout_s": config.MQTT_PUBLISH_CONFIRM_TIMEOUT_SEC,
+            "changed_keys": sorted(changed_settings.keys()),
+        }
+        merged_settings = merge_inference_settings(base_settings, changed_settings)
+
+        existing_request = db.get_inference_config_request(device_id, body.request_id)
+        if existing_request:
+            same_payload = (
+                int(existing_request.get("config_version") or 0) == int(body.config_version)
+                and (existing_request.get("request_json") or {}).get("settings") == changed_settings
+            )
+            if not same_payload:
+                raise HTTPException(status_code=409, detail="request_id already exists with different payload")
+
+            if existing_request.get("request_state") == "publish_failed":
+                stored = db.retry_inference_config_request(device_id, body.request_id) or existing_request
+            else:
+                return {
+                    "success": True,
+                    "message": "Inference config request already exists",
+                    "data": {
+                        "device_id": device_id,
+                        "topic": build_inference_desired_topic(device_id),
+                        "request": existing_request,
+                    },
+                }
+        else:
+            pending_request = summary.get("pending_request")
+            if pending_request:
+                raise HTTPException(status_code=409, detail="Another inference config request is still pending")
+
+            latest_version = max(int(summary.get("next_config_version") or 1) - 1, 0)
+            if body.config_version <= latest_version:
+                raise HTTPException(status_code=409, detail="config_version must be greater than the latest request version")
+
+            stored = db.record_inference_config_desired(
+                device_id=device_id,
+                request_id=body.request_id,
+                config_version=body.config_version,
+                settings_patch_json=changed_settings,
+                base_settings_json=base_settings,
+                merged_settings_json=merged_settings,
+                request_json=request_payload,
+                created_by=current_user.username,
+            )
+            if not stored:
+                raise HTTPException(status_code=409, detail="Failed to store inference config request")
+
+        try:
+            publish_meta = _publish_inference_config(device_id, request_payload)
+            db.record_system_event({
+                "device_id": device_id,
+                "event_type": "inference_config_publish_confirmed",
+                "severity": "info",
+                "message": f"Inference config publish confirmed for {body.request_id}",
+                "payload": {
+                    **publish_context,
+                    **publish_meta,
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }, touch_last_seen=False)
+        except HTTPException as exc:
+            db.record_inference_config_publish_failed(
+                device_id,
+                body.request_id,
+                exc.detail,
+                payload={
+                    **publish_context,
+                    **(getattr(exc, "publish_metadata", {}) or {}),
+                    "error": exc.detail,
+                },
+            )
+            raise
+        except Exception as exc:
+            db.record_inference_config_publish_failed(
+                device_id,
+                body.request_id,
+                str(exc),
+                payload={
+                    **publish_context,
+                    "error": str(exc),
+                },
+            )
+            raise HTTPException(status_code=502, detail="Failed to publish MQTT message")
+
+        _notify_remote_ws({
+            "event_type": "inference_config_desired",
+            "device_id": device_id,
+            "topic": publish_meta["topic"],
+            "data": request_payload,
+            "request": db.get_inference_config_request(device_id, body.request_id) or stored,
+            "received_at": datetime.now(timezone.utc).isoformat(),
+        })
+
+        return {
+            "success": True,
+            "message": "Inference config published",
+            "data": {
+                "device_id": device_id,
+                "topic": publish_meta["topic"],
+                "request": db.get_inference_config_request(device_id, body.request_id) or stored,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Post inference config error: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 

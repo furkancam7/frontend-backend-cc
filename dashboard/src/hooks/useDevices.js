@@ -32,6 +32,19 @@ export const deriveDeviceOnline = (device) => {
   return isHeartbeatOnline(device);
 };
 
+export const normalizeSelectedDeviceId = (value) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+
+  if (value && typeof value === 'object') {
+    return normalizeSelectedDeviceId(value.id ?? value.device_id ?? value.name);
+  }
+
+  return null;
+};
+
 export default function useDevices(token, onUnauthorized) {
   const onUnauthorizedRef = useRef(onUnauthorized);
   onUnauthorizedRef.current = onUnauthorized;
@@ -111,7 +124,7 @@ export default function useDevices(token, onUnauthorized) {
   }, [token]);
 
   const handleSelectDevice = useCallback((deviceId) => {
-    setSelectedDeviceId(deviceId);
+    setSelectedDeviceId(normalizeSelectedDeviceId(deviceId));
   }, []);
 
   return {

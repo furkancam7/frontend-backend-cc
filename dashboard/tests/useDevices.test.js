@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { deriveDeviceOnline, isHeartbeatOnline } from '../src/hooks/useDevices';
+import { deriveDeviceOnline, isHeartbeatOnline, normalizeSelectedDeviceId } from '../src/hooks/useDevices';
 
 describe('device online derivation', () => {
   beforeEach(() => {
@@ -39,5 +39,12 @@ describe('device online derivation', () => {
 
   it('keeps explicit online status online even without heartbeat data', () => {
     expect(deriveDeviceOnline({ current_status: 'online' })).toBe(true);
+  });
+
+  it('normalizes selected device values into a canonical string id', () => {
+    expect(normalizeSelectedDeviceId('TOWER-001')).toBe('TOWER-001');
+    expect(normalizeSelectedDeviceId({ id: 'TOWER-001' })).toBe('TOWER-001');
+    expect(normalizeSelectedDeviceId({ device_id: 'TOWER-001' })).toBe('TOWER-001');
+    expect(normalizeSelectedDeviceId({})).toBeNull();
   });
 });

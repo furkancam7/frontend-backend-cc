@@ -4,11 +4,14 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
+from mqtt.inference_config import normalize_inference_ack
+
 logger = logging.getLogger(__name__)
 
 ACCESS_TOPIC_RE = re.compile(r"^devices/(?P<device_id>[^/]+)/state/access$")
 NETWORK_TOPIC_RE = re.compile(r"^devices/(?P<device_id>[^/]+)/state/network$")
 CONFIG_APPLIED_TOPIC_RE = re.compile(r"^devices/(?P<device_id>[^/]+)/config/applied$")
+INFERENCE_CONFIG_APPLIED_TOPIC_RE = re.compile(r"^devices/(?P<device_id>[^/]+)/inference/config/applied$")
 COMMAND_RESULT_TOPIC_RE = re.compile(r"^devices/(?P<device_id>[^/]+)/cmd/result$")
 SYSTEM_EVENT_TOPIC_RE = re.compile(r"^devices/(?P<device_id>[^/]+)/events/system$")
 
@@ -16,6 +19,7 @@ REMOTE_SUBSCRIBE_TOPICS = [
     ("devices/+/state/access", 1),
     ("devices/+/state/network", 1),
     ("devices/+/config/applied", 1),
+    ("devices/+/inference/config/applied", 1),
     ("devices/+/cmd/result", 1),
     ("devices/+/events/system", 1),
 ]
@@ -199,6 +203,41 @@ def handle_remote_management_message(db, topic: str, payload_bytes: bytes) -> Op
         db.record_config_applied(normalized)
         after = db.get_remote_device(device_id)
         return _emit_event("config_applied", device_id, normalized, before, after)
+
+    if match := INFERENCE_CONFIG_APPLIED_TOPIC_RE.match(topic):
+        device_id = match.group("device_id")
+        normalized = normalize_inference_ack(payload)
+        payload_device_id = normalized.get("device_id")
+        if payload_device_id and payload_device_id != device_id:
+            db.record_system_event({
+                "device_id": device_id,
+                "event_type": "inference_config_ack_device_mismatch",
+                "severity": "warning",
+                "message": "Inference config ACK payload device_id did not match MQTT topic",
+                "payload": {
+                    **normalized,
+                    "topic_device_id": device_id,
+                    "payload_device_id": payload_device_id,
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        # The MQTT topic is the routing source of truth for which device this ACK belongs to.
+        normalized["device_id"] = device_id
+        before = (db.get_remote_device(device_id) or {}).get("current_status")
+        updated = db.record_inference_config_applied(normalized)
+        if not updated:
+            db.record_system_event({
+                "device_id": device_id,
+                "event_type": "inference_config_orphan_ack",
+                "severity": "warning",
+                "message": "Inference config ACK did not match a known request",
+                "payload": normalized,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+            after = db.get_remote_device(device_id)
+            return _emit_event("inference_config_orphan_ack", device_id, normalized, before, after)
+        after = db.get_remote_device(device_id)
+        return _emit_event("inference_config_applied", device_id, updated, before, after)
 
     if match := COMMAND_RESULT_TOPIC_RE.match(topic):
         device_id = match.group("device_id")

@@ -47,6 +47,8 @@ class Config:
     MQTT_TLS_ENABLED = os.getenv("MQTT_TLS_ENABLED", "false").lower() == "true"
     MQTT_TLS_CA_CERT = os.getenv("MQTT_TLS_CA_CERT", "")  
     MQTT_TLS_INSECURE = os.getenv("MQTT_TLS_INSECURE", "false").lower() == "true"
+    INFERENCE_CONFIG_ACK_TIMEOUT_SEC = int(os.getenv("INFERENCE_CONFIG_ACK_TIMEOUT_SEC", "120"))
+    MQTT_PUBLISH_CONFIRM_TIMEOUT_SEC = int(os.getenv("MQTT_PUBLISH_CONFIRM_TIMEOUT_SEC", "2"))
     
     # MinIO Settings
     MINIO_ENABLED = os.getenv("MINIO_ENABLED", "true").lower() == "true"
