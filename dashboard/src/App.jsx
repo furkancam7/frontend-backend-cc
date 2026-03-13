@@ -11,7 +11,10 @@ import useDevices from './hooks/useDevices'
 import useMapUI from './hooks/useMapUI'
 import useMapLocations from './hooks/useMapLocations'
 import useAnalysis from './hooks/useAnalysis'
-import { usePreferences } from './context/PreferencesContext'
+import LanguageThemeControls from './components/LanguageThemeControls'
+import { useUiTranslation } from './i18n/useUiTranslation'
+import { toIntlLocale } from './i18n/locale'
+import { localizeDetectionClassName } from './utils/detectionLabels'
 
 const Icon = React.memo(({ path, className = "w-5 h-5" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,14 +80,13 @@ export default function App() {
     handleUnauthorized
   } = useAuth();
 
-  const {
-    language,
-    setLanguage,
-    theme,
-    setTheme,
-    locale,
-    t
-  } = usePreferences();
+  const { t, i18n } = useUiTranslation([
+    'common',
+    'app',
+    'mapStyles',
+    'notifications'
+  ]);
+  const locale = toIntlLocale(i18n.resolvedLanguage);
 
   const {
     detections,
@@ -305,10 +307,10 @@ export default function App() {
             {isAdmin && devices.length > 0 && (
               <div className="hidden sm:flex items-center gap-3 text-[10px]">
                 {[
-                  { key: 'online', label: 'MQTT' },
-                  { key: 'tailscale_ok', label: 'Tailscale' },
-                  { key: 'ssh_ready', label: 'SSH' },
-                  { key: 'reverse_tunnel_ok', label: 'Bastion' },
+                  { key: 'online', label: t('app.services.mqtt') },
+                  { key: 'tailscale_ok', label: t('app.services.tailscale') },
+                  { key: 'ssh_ready', label: t('app.services.ssh') },
+                  { key: 'reverse_tunnel_ok', label: t('app.services.bastion') },
                 ].map(({ key, label }) => {
                   const allOk = devices.every(d => d[key] === true);
                   const anyOk = devices.some(d => d[key] === true);
@@ -334,13 +336,7 @@ export default function App() {
                 </span>
               );
             })()}
-            <PreferenceControls
-              language={language}
-              onLanguageChange={setLanguage}
-              theme={theme}
-              onThemeToggle={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
-              t={t}
-            />
+            <LanguageThemeControls />
             <span className="text-[var(--text-muted)]">|</span>
             <HeaderClock />
           </div>
@@ -555,33 +551,6 @@ function PanelContainer({ title, titleColor = 'text-white', badge, onClose, chil
   );
 }
 
-function PreferenceControls({ language, onLanguageChange, theme, onThemeToggle, t, className = '' }) {
-  return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
-      <label className="sr-only" htmlFor="language-select">{t('common.language')}</label>
-      <select
-        id="language-select"
-        value={language}
-        onChange={(e) => onLanguageChange(e.target.value)}
-        className="h-7 rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] px-1.5 text-[10px] text-[var(--text-main)] focus:outline-none"
-        title={t('common.language')}
-      >
-        <option value="en">EN</option>
-        <option value="tr">TR</option>
-        <option value="sr">SR</option>
-      </select>
-      <button
-        type="button"
-        onClick={onThemeToggle}
-        className="h-7 rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] px-2 text-[10px] uppercase text-[var(--text-main)] transition-colors hover:border-cyan-500/70"
-        title={`${t('common.theme')}: ${theme === 'dark' ? t('common.dark') : t('common.light')}`}
-      >
-        {theme === 'dark' ? t('common.dark') : t('common.light')}
-      </button>
-    </div>
-  );
-}
-
 function getLocalizedMapStyleName(style, t) {
   const keyMap = {
     dark: 'mapStyles.dark',
@@ -641,6 +610,7 @@ function MapControls({ isMapToolsOpen, isStyleMenuOpen, mapStyle, MAP_STYLES, to
 }
 
 function ContextModal({ crop, fullFrameData, onClose, t, locale }) {
+  const localizedClass = localizeDetectionClassName(crop.class, t);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-8" onClick={onClose}>
       <div className="bg-[#1a1a1a] border border-gray-700 rounded-lg max-w-full md:max-w-6xl w-full max-h-full flex flex-col overflow-hidden mx-2 md:mx-4" onClick={e => e.stopPropagation()}>
@@ -648,7 +618,7 @@ function ContextModal({ crop, fullFrameData, onClose, t, locale }) {
           <div>
             <h2 className="text-xl font-bold text-white">{t('app.detectionContext')}</h2>
             <p className="text-sm text-gray-400">
-              {crop.class} ({(crop.accuracy || 0).toFixed(2)}%) - {crop.captured_time || crop.detection_time ? new Date(crop.captured_time || crop.detection_time).toLocaleString(locale) : t('app.unknownTime')}
+              {localizedClass} ({(crop.accuracy || 0).toFixed(2)}%) - {crop.captured_time || crop.detection_time ? new Date(crop.captured_time || crop.detection_time).toLocaleString(locale) : t('app.unknownTime')}
             </p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl">×</button>
@@ -662,7 +632,7 @@ function ContextModal({ crop, fullFrameData, onClose, t, locale }) {
                 const { x1, y1, x2, y2 } = crop.bbox;
                 return (
                   <div className="absolute border-2 border-red-500 bg-red-500 bg-opacity-20" style={{ left: `${(x1 / width) * 100}%`, top: `${(y1 / height) * 100}%`, width: `${((x2 - x1) / width) * 100}%`, height: `${((y2 - y1) / height) * 100}%` }}>
-                    <span className="bg-red-600 text-white text-xs px-1 font-bold">{crop.class} {(crop.accuracy || 0).toFixed(2)}%</span>
+                    <span className="bg-red-600 text-white text-xs px-1 font-bold">{localizedClass} {(crop.accuracy || 0).toFixed(2)}%</span>
                   </div>
                 );
               })()}
@@ -670,7 +640,7 @@ function ContextModal({ crop, fullFrameData, onClose, t, locale }) {
           ) : crop.image_path ? (
             <div className="relative inline-block">
               <img src={crop.image_path.startsWith('http') ? crop.image_path : `/api${crop.image_path}`} alt={t('notifications.cropAlt')} className="max-h-[80vh] object-contain rounded-lg" />
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded text-sm text-white">{crop.class} - {Math.round((crop.accuracy || 0) * 100)}%</div>
+              <div className="absolute bottom-2 left-2 bg-black bg-opacity-70 px-2 py-1 rounded text-sm text-white">{localizedClass} - {Math.round((crop.accuracy || 0) * 100)}%</div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-4">

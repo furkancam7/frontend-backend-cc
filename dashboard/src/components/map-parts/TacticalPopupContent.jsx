@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getThreatColor } from './mapUtils';
+import { useUiTranslation } from '../../i18n/useUiTranslation';
 
 const THREAT_HEX = {
   person: '#ef4444',
@@ -15,6 +16,7 @@ const getThreatHex = (className) => {
 };
 
 const TacticalPopupContent = ({ crop, isAdmin }) => {
+  const { t } = useUiTranslation(['mapPopup']);
   const [editState, setEditState] = useState({ field: null, value: '' });
   const [imageError, setImageError] = useState(false);
   const cropId = crop?.crop_id;
@@ -23,7 +25,7 @@ const TacticalPopupContent = ({ crop, isAdmin }) => {
     setEditState({ field: null, value: '' });
   }, [cropId]);
 
-  const className = crop?.class || 'unknown';
+  const className = crop?.class || t('mapPopup.unknown');
   const accuracy = crop?.accuracy ?? 0;
   const lat = crop?.location?.latitude;
   const lng = crop?.location?.longitude;
@@ -90,7 +92,7 @@ const TacticalPopupContent = ({ crop, isAdmin }) => {
             onBlur={() => handleUpdate('class')}
             onKeyDown={e => handleKeyDown(e, 'class')}
             className="bg-black text-cyan-400 border border-cyan-500 w-24 text-xs outline-none uppercase font-bold"
-            aria-label="Edit class name"
+            aria-label={t('mapPopup.editClassName')}
           />
         ) : (
           <span
@@ -103,7 +105,7 @@ const TacticalPopupContent = ({ crop, isAdmin }) => {
             {className.toUpperCase()} {isAdmin && ''}
           </span>
         )}
-        <span className="tactical-status">TRACKING</span>
+        <span className="tactical-status">{t('mapPopup.tracking')}</span>
       </div>
 
       <div className="tactical-image-container">
@@ -112,17 +114,17 @@ const TacticalPopupContent = ({ crop, isAdmin }) => {
             src={`/api/image/crop/${cropId}`}
             className="tactical-image"
             onError={() => setImageError(true)}
-            alt={`${className} detection`}
+            alt={`${className} ${t('mapPopup.detection')}`}
           />
         ) : (
-          <div className="no-image">NO SIGNAL</div>
+          <div className="no-image">{t('mapPopup.noSignal')}</div>
         )}
         <div className="tactical-overlay" />
       </div>
 
       <div className="tactical-footer">
         <div className="flex items-center gap-1">
-          ACC:
+          {t('mapPopup.acc')}:
           {editState.field === 'accuracy' ? (
             <input
               autoFocus
@@ -132,7 +134,7 @@ const TacticalPopupContent = ({ crop, isAdmin }) => {
               onBlur={() => handleUpdate('accuracy')}
               onKeyDown={e => handleKeyDown(e, 'accuracy')}
               className="bg-black text-white border border-cyan-500 w-12 text-[9px] outline-none"
-              aria-label="Edit accuracy"
+              aria-label={t('mapPopup.editAccuracy')}
             />
           ) : (
             <span
@@ -146,13 +148,13 @@ const TacticalPopupContent = ({ crop, isAdmin }) => {
           )}
         </div>
         <div className="flex items-center gap-1">
-          ID: <span className="value">{recordId ? recordId.slice(0, 12) : 'UNK'}</span>
+          {t('mapPopup.id')}: <span className="value">{recordId ? recordId.slice(0, 12) : t('mapPopup.unk')}</span>
         </div>
       </div>
 
       <div className="tactical-coords">
-        <div>SENSOR LAT: <span className="value">{lat != null ? lat.toFixed(5) : 'N/A'}</span></div>
-        <div>SENSOR LNG: <span className="value">{lng != null ? lng.toFixed(5) : 'N/A'}</span></div>
+        <div>{t('mapPopup.sensorLat')}: <span className="value">{lat != null ? lat.toFixed(5) : t('mapPopup.na')}</span></div>
+        <div>{t('mapPopup.sensorLng')}: <span className="value">{lng != null ? lng.toFixed(5) : t('mapPopup.na')}</span></div>
       </div>
     </div>
   );

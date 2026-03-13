@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, memo } from 'react';
 import mapboxgl from 'mapbox-gl';
+import { useUiTranslation } from '../../i18n/useUiTranslation';
 
 const Icon = memo(({ path, className = "w-5 h-5" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7,7 +8,7 @@ const Icon = memo(({ path, className = "w-5 h-5" }) => (
   </svg>
 ));
 
-function MapPicker({ initialLat, initialLng, initialZoom, onConfirm, onCancel }) {
+function MapPicker({ initialLat, initialLng, initialZoom, onConfirm, onCancel, t }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const marker = useRef(null);
@@ -68,7 +69,7 @@ function MapPicker({ initialLat, initialLng, initialZoom, onConfirm, onCancel })
   return (
     <div className="absolute inset-0 z-50 flex flex-col bg-black">
       <div className="h-10 flex items-center justify-between px-3 border-b border-gray-800 flex-shrink-0">
-        <span className="text-xs font-bold text-white uppercase tracking-wider">Pick Location on Map</span>
+        <span className="text-xs font-bold text-white uppercase tracking-wider">{t('locationSettings.pickLocationOnMap')}</span>
         <button onClick={onCancel} className="text-gray-500 hover:text-white">
           <Icon path="M6 18L18 6M6 6l12 12" className="w-4 h-4" />
         </button>
@@ -84,21 +85,21 @@ function MapPicker({ initialLat, initialLng, initialZoom, onConfirm, onCancel })
           onClick={onCancel}
           className="flex-1 py-2 rounded text-xs font-semibold uppercase tracking-wider bg-gray-900 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
         >
-          Cancel
+          {t('locationSettings.cancel')}
         </button>
         <button
           onClick={handleConfirm}
           disabled={!picked}
           className="flex-1 py-2 rounded text-xs font-semibold uppercase tracking-wider bg-cyan-600 text-white hover:bg-cyan-500 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          Confirm
+          {t('locationSettings.confirm')}
         </button>
       </div>
     </div>
   );
 }
 
-function LocationInput({ label, location, onChange, disabled }) {
+function LocationInput({ label, location, onChange, disabled, t }) {
   const [localValues, setLocalValues] = useState({
     name: location?.name || '',
     latitude: location?.latitude?.toString() || '',
@@ -152,6 +153,7 @@ function LocationInput({ label, location, onChange, disabled }) {
           initialZoom={parseFloat(localValues.zoom) || null}
           onConfirm={handleMapConfirm}
           onCancel={() => setShowMapPicker(false)}
+          t={t}
         />
       )}
       <div className="flex items-center justify-between">
@@ -160,16 +162,16 @@ function LocationInput({ label, location, onChange, disabled }) {
           onClick={() => setShowMapPicker(true)}
           disabled={disabled}
           className="flex items-center gap-1 px-2 py-1 rounded text-[10px] uppercase tracking-wider font-semibold bg-cyan-900/30 border border-cyan-800/50 text-cyan-400 hover:bg-cyan-800/40 hover:text-cyan-300 transition-all disabled:opacity-50"
-          title="Pick from map"
+          title={t('locationSettings.pickFromMap')}
         >
           <Icon path="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" className="w-3 h-3" />
-          Map
+          {t('locationSettings.map')}
         </button>
       </div>
       
       <div className="space-y-2">
         <div>
-          <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Name</label>
+          <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">{t('locationSettings.name')}</label>
           <input
             type="text"
             value={localValues.name}
@@ -177,13 +179,13 @@ function LocationInput({ label, location, onChange, disabled }) {
             onBlur={handleBlur}
             disabled={disabled}
             className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-gray-700 focus:outline-none disabled:opacity-50"
-            placeholder="Location name"
+            placeholder={t('locationSettings.locationName')}
           />
         </div>
         
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Latitude</label>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">{t('locationSettings.latitude')}</label>
             <input
               type="number"
               step="any"
@@ -192,11 +194,11 @@ function LocationInput({ label, location, onChange, disabled }) {
               onBlur={handleBlur}
               disabled={disabled}
               className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:border-gray-700 focus:outline-none disabled:opacity-50"
-              placeholder="-90 to 90"
+              placeholder={t('locationSettings.latitude')}
             />
           </div>
           <div>
-            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Longitude</label>
+            <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">{t('locationSettings.longitude')}</label>
             <input
               type="number"
               step="any"
@@ -205,13 +207,13 @@ function LocationInput({ label, location, onChange, disabled }) {
               onBlur={handleBlur}
               disabled={disabled}
               className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:border-gray-700 focus:outline-none disabled:opacity-50"
-              placeholder="-180 to 180"
+              placeholder={t('locationSettings.longitude')}
             />
           </div>
         </div>
         
         <div className="w-1/2">
-          <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">Zoom Level</label>
+          <label className="block text-[10px] text-gray-500 uppercase tracking-wider mb-1">{t('locationSettings.zoomLevel')}</label>
           <input
             type="number"
             step="0.1"
@@ -222,7 +224,7 @@ function LocationInput({ label, location, onChange, disabled }) {
             onBlur={handleBlur}
             disabled={disabled}
             className="w-full bg-gray-900 border border-gray-800 rounded px-3 py-2 text-sm text-white font-mono placeholder-gray-600 focus:border-gray-700 focus:outline-none disabled:opacity-50"
-            placeholder="1-22"
+            placeholder={t('locationSettings.zoomRange')}
           />
         </div>
       </div>
@@ -230,13 +232,14 @@ function LocationInput({ label, location, onChange, disabled }) {
       <div className="text-[10px] text-gray-600 font-mono">
         {localValues.latitude && localValues.longitude 
           ? `${parseFloat(localValues.latitude).toFixed(6)}, ${parseFloat(localValues.longitude).toFixed(6)}`
-          : 'Enter coordinates'}
+          : t('locationSettings.enterCoordinates')}
       </div>
     </div>
   );
 }
 
 export default function LocationSettings({ locations, onUpdate, onResetDefaults, isLoading, error, onClose }) {
+  const { t } = useUiTranslation(['locationSettings']);
   const [homeLocation, setHomeLocation] = useState(locations?.home || {});
   const [responsibleArea, setResponsibleArea] = useState(locations?.responsibleArea || {});
   const [saveStatus, setSaveStatus] = useState(null);
@@ -258,14 +261,14 @@ export default function LocationSettings({ locations, onUpdate, onResetDefaults,
   }, [homeLocation, responsibleArea, onUpdate]);
 
   const handleReset = useCallback(async () => {
-    if (window.confirm('Reset to default locations? This will overwrite your custom settings.')) {
+    if (window.confirm(t('locationSettings.resetConfirm'))) {
       const result = await onResetDefaults();
       if (result.success) {
         setHomeLocation(locations?.home || {});
         setResponsibleArea(locations?.responsibleArea || {});
       }
     }
-  }, [onResetDefaults, locations]);
+  }, [onResetDefaults, locations, t]);
 
   return (
     <div className="flex flex-col h-full max-h-full min-h-0 bg-black">
@@ -275,7 +278,7 @@ export default function LocationSettings({ locations, onUpdate, onResetDefaults,
           <button onClick={onClose} className="hover:bg-gray-900 p-1 rounded text-gray-400 hover:text-white">
             <Icon path="M15 19l-7-7 7-7" className="w-4 h-4" />
           </button>
-          <h2 className="text-sm font-bold uppercase tracking-wider text-white">Location Settings</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-white">{t('locationSettings.title')}</h2>
         </div>
         <button onClick={onClose} className="text-gray-500 hover:text-white">
           <Icon path="M6 18L18 6M6 6l12 12" />
@@ -291,17 +294,19 @@ export default function LocationSettings({ locations, onUpdate, onResetDefaults,
         )}
 
         <LocationInput
-          label="Home Location"
+          label={t('locationSettings.homeLocation')}
           location={homeLocation}
           onChange={setHomeLocation}
           disabled={isLoading}
+          t={t}
         />
 
         <LocationInput
-          label="Responsible Area"
+          label={t('locationSettings.responsibleArea')}
           location={responsibleArea}
           onChange={setResponsibleArea}
           disabled={isLoading}
+          t={t}
         />
 
         {}
@@ -320,17 +325,17 @@ export default function LocationSettings({ locations, onUpdate, onResetDefaults,
             {isLoading || saveStatus === 'saving' ? (
               <>
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                APPLYING...
+                {t('locationSettings.applying')}
               </>
             ) : saveStatus === 'saved' ? (
               <>
                 <Icon path="M5 13l4 4L19 7" className="w-4 h-4" />
-                SAVED!
+                {t('locationSettings.saved')}
               </>
             ) : saveStatus === 'error' ? (
-              'FAILED TO SAVE'
+              t('locationSettings.failedToSave')
             ) : (
-              'APPLY CONFIGURATION'
+              t('locationSettings.applyConfiguration')
             )}
           </button>
 
@@ -339,7 +344,7 @@ export default function LocationSettings({ locations, onUpdate, onResetDefaults,
             disabled={isLoading}
             className="w-full py-2 rounded text-xs uppercase tracking-wider bg-gray-900 border border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 transition-all disabled:opacity-50"
           >
-            Reset Defaults
+            {t('locationSettings.resetDefaults')}
           </button>
         </div>
       </div>

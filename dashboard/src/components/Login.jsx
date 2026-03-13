@@ -1,34 +1,10 @@
 import React, { useState } from 'react';
 import { login, setToken as setApiToken } from '../services/api';
-import { usePreferences } from '../context/PreferencesContext';
-
-const PreferenceControls = ({ language, onLanguageChange, theme, onThemeToggle, t }) => (
-  <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-    <label className="sr-only" htmlFor="login-language-select">{t('common.language')}</label>
-    <select
-      id="login-language-select"
-      value={language}
-      onChange={(e) => onLanguageChange(e.target.value)}
-      className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] px-2 text-[11px] text-[var(--text-main)] focus:outline-none"
-      title={t('common.language')}
-    >
-      <option value="en">EN</option>
-      <option value="tr">TR</option>
-      <option value="sr">SR</option>
-    </select>
-    <button
-      type="button"
-      onClick={onThemeToggle}
-      className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] px-2 text-[11px] uppercase text-[var(--text-main)]"
-      title={`${t('common.theme')}: ${theme === 'dark' ? t('common.dark') : t('common.light')}`}
-    >
-      {theme === 'dark' ? t('common.dark') : t('common.light')}
-    </button>
-  </div>
-);
+import LanguageThemeControls from './LanguageThemeControls';
+import { useUiTranslation } from '../i18n/useUiTranslation';
 
 const Login = ({ setToken, setUserRole, setCurrentUser }) => {
-  const { language, setLanguage, theme, setTheme, t } = usePreferences();
+  const { t } = useUiTranslation(['common', 'login']);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -60,13 +36,7 @@ const Login = ({ setToken, setUserRole, setCurrentUser }) => {
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-[var(--bg-app)] text-[var(--text-main)] relative overflow-hidden font-sans selection:bg-[var(--selection-bg)] selection:text-[var(--selection-text)]">
-      <PreferenceControls
-        language={language}
-        onLanguageChange={setLanguage}
-        theme={theme}
-        onThemeToggle={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
-        t={t}
-      />
+      <LanguageThemeControls className="absolute top-4 right-4 z-20 gap-2" languageId="login-language-select" compact={false} />
 
       { }
       <div className="absolute inset-0 z-0">

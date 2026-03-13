@@ -18,11 +18,19 @@ const DEFAULT_MAP_ZOOM = 16;
 const DEFAULT_MAP_PITCH = 60;
 const DEFAULT_MAP_BEARING = -17.6;
 const DEVICE_COVERAGE_RADIUS_KM = 5;
+const MAP_PERF_DEBUG = import.meta.env.DEV && import.meta.env.VITE_MAP_PERF_DEBUG === 'true';
+
+const recordMapPerfSample = (label, durationMs, metadata = {}) => {
+    if (!MAP_PERF_DEBUG) return;
+    console.debug(`[MapPerf] ${label}: ${durationMs.toFixed(1)}ms`, metadata);
+};
 
 const toCoordinateNumber = (value) => {
     const numericValue = Number(value);
     return Number.isFinite(numericValue) ? numericValue : null;
 };
+
+const normalizeClassName = (value) => String(value ?? '').toLowerCase();
 
 const hasValidCoordinates = (location) =>
     toCoordinateNumber(location?.latitude) !== null && toCoordinateNumber(location?.longitude) !== null;
@@ -526,7 +534,7 @@ const MapView = ({
             .map(c => {
                 let color = '#4ade80';
                 let borderColor = '#22c55e';
-                const cls = (c.class || '').toLowerCase();
+                const cls = normalizeClassName(c.class);
                 if (['person', 'human'].includes(cls)) { color = '#f87171'; borderColor = '#ef4444'; }
                 else if (['car', 'truck', 'bus'].includes(cls)) { color = '#facc15'; borderColor = '#eab308'; }
 
@@ -541,7 +549,7 @@ const MapView = ({
                     geometry: { type: 'Point', coordinates: [lng, lat] },
                     properties: {
                         id: c.crop_id,
-                        class: (c.class || 'UNK').toUpperCase(),
+                        class: (String(c.class ?? 'UNK') || 'UNK').toUpperCase(),
                         color,
                         borderColor,
                         selected: currentSelectedDetectionId === c.crop_id
@@ -594,7 +602,7 @@ const MapView = ({
         const currentDevices = dataRef.current.devices || [];
         const allConfigs = dataRef.current.soloZoneConfig; 
         const soloDevices = currentDevices.filter(d => 
-            d.id?.toUpperCase().startsWith('SOLO') && 
+            String(d.id ?? '').toUpperCase().startsWith('SOLO') &&
             hasValidCoordinates(d.location)
         );
         const fingerprint = `${soloDevices.map(d => {
@@ -777,6 +785,7 @@ const MapView = ({
     }, [onMarkerClick]);
 
     const runPendingMapSync = useCallback(() => {
+        const startedAt = performance.now();
         mapSyncFrameRef.current = null;
 
         if (!map.current) return;
@@ -902,6 +911,7 @@ const MapView = ({
         let resizeRaf = null;
         let resizeObserver = null;
         let styleReadyHandled = false;
+        let handleStyleReady = null;
         const mapInitStartedAt = performance.now();
 
         try {
@@ -919,7 +929,7 @@ const MapView = ({
 
             map.current.addControl(new mapboxgl.NavigationControl(), 'top-left');
             map.current.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
-            const handleStyleReady = () => {
+            handleStyleReady = () => {
                 if (styleReadyHandled) return;
                 if (!map.current || !map.current.isStyleLoaded()) return;
                 styleReadyHandled = true;
@@ -984,7 +994,10 @@ const MapView = ({
                     cancelAnimationFrame(mapSyncFrameRef.current);
                     mapSyncFrameRef.current = null;
                 }
-                map.current.off('load', handleStyleReady);
+                if (handleStyleReady) {
+                    map.current.off('load', handleStyleReady);
+                    map.current.off('style.load', handleStyleReady);
+                }
                 map.current.remove();
                 map.current = null;
             }

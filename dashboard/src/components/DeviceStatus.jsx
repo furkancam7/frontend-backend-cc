@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { api } from '../services/api';
+import { useUiTranslation } from '../i18n/useUiTranslation';
+import { toIntlLocale } from '../i18n/locale';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
 
 
 
-const DeviceMiniMap = memo(({ latitude, longitude }) => {
+const DeviceMiniMap = memo(({ latitude, longitude, t }) => {
     if (!latitude || !longitude) {
         return (
             <div className="w-full h-full bg-black flex flex-col items-center justify-center gap-1">
@@ -13,7 +15,7 @@ const DeviceMiniMap = memo(({ latitude, longitude }) => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                <span className="text-[9px] text-gray-600 font-medium tracking-wider">NO GPS</span>
+                <span className="text-[9px] text-gray-600 font-medium tracking-wider">{t('deviceStatus.noGps')}</span>
             </div>
         );
     }
@@ -27,7 +29,7 @@ const DeviceMiniMap = memo(({ latitude, longitude }) => {
         <div className="relative w-full h-full">
             <img
                 src={staticMapUrl}
-                alt="Location"
+                alt={t('deviceStatus.locationAlt')}
                 className="w-full h-full object-cover"
                 loading="lazy"
             />
@@ -41,7 +43,7 @@ const DeviceMiniMap = memo(({ latitude, longitude }) => {
     );
 });
 
-const DeviceEditForm = ({ device, onSave, onCancel }) => {
+const DeviceEditForm = ({ device, onSave, onCancel, t }) => {
     const [form, setForm] = useState({
         address: device.location?.address || '',
         latitude: device.location?.latitude || '',
@@ -56,19 +58,19 @@ const DeviceEditForm = ({ device, onSave, onCancel }) => {
     return (
         <div className="space-y-2 cursor-default" onClick={e => e.stopPropagation()}>
             <input
-                type="text" placeholder="Address" value={form.address}
+                type="text" placeholder={t('deviceStatus.addressPlaceholder')} value={form.address}
                 onChange={(e) => setForm(prev => ({ ...prev, address: e.target.value }))}
                 className="w-full bg-black border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-gray-600 focus:outline-none transition-colors"
                 autoFocus
             />
             <div className="flex gap-2">
                 <input
-                    type="number" step="any" placeholder="Latitude" value={form.latitude}
+                    type="number" step="any" placeholder={t('deviceStatus.latitudePlaceholder')} value={form.latitude}
                     onChange={(e) => setForm(prev => ({ ...prev, latitude: e.target.value }))}
                     className="w-1/2 bg-black border border-gray-800 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-gray-600 focus:border-gray-600 focus:outline-none transition-colors"
                 />
                 <input
-                    type="number" step="any" placeholder="Longitude" value={form.longitude}
+                    type="number" step="any" placeholder={t('deviceStatus.longitudePlaceholder')} value={form.longitude}
                     onChange={(e) => setForm(prev => ({ ...prev, longitude: e.target.value }))}
                     className="w-1/2 bg-black border border-gray-800 rounded-lg px-3 py-2 text-xs text-white font-mono placeholder-gray-600 focus:border-gray-600 focus:outline-none transition-colors"
                 />
@@ -78,20 +80,20 @@ const DeviceEditForm = ({ device, onSave, onCancel }) => {
                     onClick={handleSubmit}
                     className="flex-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 py-2 rounded-lg text-xs font-bold tracking-wide transition-all"
                 >
-                    SAVE
+                    {t('deviceStatus.save')}
                 </button>
                 <button
                     onClick={(e) => { e.stopPropagation(); onCancel(); }}
                     className="flex-1 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 py-2 rounded-lg text-xs font-bold tracking-wide transition-all"
                 >
-                    CANCEL
+                    {t('deviceStatus.cancel')}
                 </button>
             </div>
         </div>
     );
 };
 
-const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
+const DeviceView = ({ device, isAdmin, onEdit, onDelete, t, locale }) => (
     <>
         {/* Location info */}
         <div className="px-3 pb-3">
@@ -101,9 +103,9 @@ const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     </svg>
                     <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-300 truncate">{device.location?.address || 'Unknown Location'}</p>
+                        <p className="text-xs text-gray-300 truncate">{device.location?.address || t('deviceStatus.unknownLocation')}</p>
                         <p className="text-[10px] text-cyan-400/80 font-mono mt-0.5">
-                            {device.location?.latitude ? `${device.location.latitude.toFixed(5)}, ${device.location.longitude.toFixed(5)}` : 'No GPS Data'}
+                            {device.location?.latitude ? `${device.location.latitude.toFixed(5)}, ${device.location.longitude.toFixed(5)}` : t('deviceStatus.noGpsData')}
                         </p>
                     </div>
                 </div>
@@ -115,7 +117,7 @@ const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
             <div className="flex items-center gap-1.5">
                 <div className="w-1 h-1 bg-gray-600 rounded-full"></div>
                 <span className="text-[10px] text-gray-500">
-                    Last seen: <span className="text-gray-400 font-mono">{device.lastSeen ? new Date(device.lastSeen).toLocaleTimeString() : 'Never'}</span>
+                    {t('deviceStatus.lastSeen')}: <span className="text-gray-400 font-mono">{device.lastSeen ? new Date(device.lastSeen).toLocaleTimeString(locale) : t('deviceStatus.never')}</span>
                 </span>
             </div>
             {isAdmin && (
@@ -123,7 +125,7 @@ const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
                     <button
                         onClick={(e) => { e.stopPropagation(); onEdit(); }}
                         className="p-1.5 rounded-md bg-gray-900 border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700 transition-all"
-                        title="Edit"
+                        title={t('deviceStatus.edit')}
                     >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -132,7 +134,7 @@ const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
                     <button
                         onClick={(e) => { e.stopPropagation(); onDelete(device.id); }}
                         className="p-1.5 rounded-md bg-gray-900 border border-gray-800 text-gray-400 hover:text-red-400 hover:border-red-900 transition-all"
-                        title="Delete"
+                        title={t('deviceStatus.delete')}
                     >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -144,7 +146,7 @@ const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
     </>
 );
 
-const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpenHeartbeat }) => {
+const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpenHeartbeat, t, locale }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
     const handleSave = useCallback(async (id, data) => {
@@ -182,7 +184,7 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpen
                             onOpenHeartbeat?.(device);
                         }}
                         className="p-1 rounded-md text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
-                        title="Heartbeat Config"
+                        title={t('deviceStatus.heartbeatConfig')}
                     >
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
@@ -191,7 +193,7 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpen
                     <div className={`w-1.5 h-1.5 rounded-full ${device.online ? 'bg-emerald-400' : 'bg-red-500'}`}
                         style={device.online ? { boxShadow: '0 0 8px rgba(52, 211, 153, 0.6)' } : {}} />
                     <span className={`text-[10px] font-bold tracking-wider ${device.online ? 'text-emerald-400' : 'text-red-500'}`}>
-                        {device.online ? 'ONLINE' : 'OFFLINE'}
+                        {device.online ? t('common.online') : t('common.offline')}
                     </span>
                 </div>
             </div>
@@ -202,7 +204,7 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpen
                     {/* Mini map section */}
                     <div className="px-4 pb-3" onClick={() => onSelect && onSelect(device)}>
                         <div className="h-20 rounded-lg overflow-hidden border border-gray-900 bg-black">
-                            <DeviceMiniMap latitude={device.location?.latitude} longitude={device.location?.longitude} />
+                            <DeviceMiniMap latitude={device.location?.latitude} longitude={device.location?.longitude} t={t} />
                         </div>
                     </div>
 
@@ -213,6 +215,7 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpen
                                 device={device}
                                 onSave={handleSave}
                                 onCancel={() => setIsEditing(false)}
+                                t={t}
                             />
                         </div>
                     ) : (
@@ -221,6 +224,8 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpen
                             isAdmin={isAdmin}
                             onEdit={() => setIsEditing(true)}
                             onDelete={onDelete}
+                            t={t}
+                            locale={locale}
                         />
                     )}
                 </>
@@ -230,6 +235,8 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpen
 });
 
 function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpenHeartbeat }) {
+    const { t, i18n } = useUiTranslation(['deviceStatus', 'common']);
+    const locale = toIntlLocale(i18n.resolvedLanguage);
     const [localDevices, setLocalDevices] = useState(devices || []);
     const [isAdding, setIsAdding] = useState(false);
     const [newDevice, setNewDevice] = useState({ device_id: '', address: '', latitude: '', longitude: '' });
@@ -248,12 +255,12 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
         } catch (err) {
             console.error('Update failed:', err);
             setLocalDevices(originalState);
-            alert('Update failed');
+            alert(t('deviceStatus.updateFailed'));
         }
-    }, [localDevices, onDeviceUpdate]);
+    }, [localDevices, onDeviceUpdate, t]);
 
     const handleDelete = useCallback(async (id) => {
-        if (!window.confirm('Delete device?')) return;
+        if (!window.confirm(t('deviceStatus.deleteConfirm'))) return;
 
         const originalState = [...localDevices];
         setLocalDevices(prev => prev.filter(d => d.id !== id));
@@ -264,9 +271,9 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
         } catch (err) {
             console.error('Delete failed:', err);
             setLocalDevices(originalState);
-            alert('Delete failed');
+            alert(t('deviceStatus.deleteFailed'));
         }
-    }, [localDevices, onDeviceUpdate]);
+    }, [localDevices, onDeviceUpdate, t]);
 
     const handleAddDevice = async (e) => {
         e.preventDefault();
@@ -277,7 +284,7 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
             if (onDeviceUpdate) onDeviceUpdate();
         } catch (err) {
             console.error('Add failed:', err);
-            alert('Add failed');
+            alert(t('deviceStatus.addFailed'));
         }
     };
 
@@ -285,7 +292,7 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
         return localDevices;
     }, [localDevices]);
 
-    if (!localDevices) return <div className="h-full flex items-center justify-center text-gray-500 bg-black text-xs">NO DATA</div>;
+    if (!localDevices) return <div className="h-full flex items-center justify-center text-gray-500 bg-black text-xs">{t('deviceStatus.noData')}</div>;
 
     return (
         <div className="h-full flex flex-col bg-black">
@@ -293,7 +300,7 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
             <div className="p-3 border-b border-gray-900">
                 <div className="flex bg-gray-950 rounded-lg p-1">
                     <div className="flex-1 py-2 px-3 rounded-md text-xs font-bold uppercase tracking-wider bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 text-center">
-                        Devices <span className="opacity-70">({filteredDevices.length})</span>
+                        {t('deviceStatus.devices')} <span className="opacity-70">({filteredDevices.length})</span>
                     </div>
                 </div>
             </div>
@@ -309,13 +316,13 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
-                            ADD NEW DEVICE
+                            {t('deviceStatus.addNewDevice')}
                         </button>
                     ) : (
                         <form onSubmit={handleAddDevice} className="bg-gray-950 p-3 rounded-lg border border-gray-900 space-y-2">
                             <input
                                 type="text"
-                                placeholder="Device ID"
+                                placeholder={t('deviceStatus.deviceIdPlaceholder')}
                                 className="w-full bg-black border border-gray-800 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-gray-700 focus:outline-none"
                                 value={newDevice.device_id}
                                 onChange={e => setNewDevice({ ...newDevice, device_id: e.target.value })}
@@ -326,14 +333,14 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
                                     type="submit"
                                     className="flex-1 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 py-2 rounded-lg text-xs font-bold tracking-wide transition-all"
                                 >
-                                    SAVE
+                                    {t('deviceStatus.save')}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setIsAdding(false)}
                                     className="flex-1 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 py-2 rounded-lg text-xs font-bold tracking-wide transition-all"
                                 >
-                                    CANCEL
+                                    {t('deviceStatus.cancel')}
                                 </button>
                             </div>
                         </form>
@@ -352,6 +359,8 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
                         onDelete={handleDelete}
                         onSelect={onSelectDevice}
                         onOpenHeartbeat={onOpenHeartbeat}
+                        t={t}
+                        locale={locale}
                     />
                 ))}
                 {filteredDevices.length === 0 && (
@@ -359,7 +368,7 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpen
                         <svg className="w-10 h-10 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-xs tracking-wider">NO DEVICES FOUND</span>
+                        <span className="text-xs tracking-wider">{t('deviceStatus.noDevicesFound')}</span>
                     </div>
                 )}
             </div>

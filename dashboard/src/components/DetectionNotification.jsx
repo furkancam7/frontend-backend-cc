@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { HQ } from '../constants';
-import { usePreferences } from '../context/PreferencesContext';
+import { useUiTranslation } from '../i18n/useUiTranslation';
+import { localizeDetectionClassName } from '../utils/detectionLabels';
 
 const FireIcon = () => (
     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -106,6 +107,10 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
     const [isExiting, setIsExiting] = useState(false);
     const category = getCategory(notification.class);
     const isFireCategory = category.key === 'fire' || category.key === 'smoke';
+    const localizedClass = useMemo(
+        () => localizeDetectionClassName(notification.class, t),
+        [notification.class, t]
+    );
     const distance = useMemo(() => {
         if (notification.location?.latitude && notification.location?.longitude) {
             return calculateDistance(
@@ -197,7 +202,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
                     <div className="flex-1 min-w-0 pt-0.5">
                         {}
                         <div className="text-white font-bold text-[11px] sm:text-sm mb-0.5 uppercase tracking-wide truncate">
-                            {notification.class} {t('notifications.detected')}
+                            {localizedClass} {t('notifications.detected')}
                         </div>
 
                         {}
@@ -211,7 +216,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
 
                         {}
                         <div className="flex items-center gap-1 sm:gap-2 mt-1 text-[9px] sm:text-[10px] text-gray-500">
-                            <span className="capitalize truncate">{notification.class}</span>
+                            <span className="capitalize truncate">{localizedClass}</span>
                             <span>-</span>
                             <span className="flex-shrink-0">{formatAccuracy(notification.accuracy)}%</span>
                         </div>
@@ -237,7 +242,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
 });
 
 const DetectionNotification = ({ notifications, onDismiss, onClick }) => {
-    const { t } = usePreferences();
+    const { t } = useUiTranslation(['notifications']);
     const displayNotifications = useMemo(() => {
         const LIMIT = 50;
         const count = notifications.length;

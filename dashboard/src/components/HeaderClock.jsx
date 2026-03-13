@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { usePreferences } from '../context/PreferencesContext';
+import { useUiTranslation } from '../i18n/useUiTranslation';
+import { toIntlLocale } from '../i18n/locale';
 
 function HeaderClock() {
-  const { locale } = usePreferences();
+  const { i18n } = useUiTranslation();
+  const locale = toIntlLocale(i18n.resolvedLanguage);
   const [time, setTime] = useState(new Date().toLocaleString(locale));
 
   useEffect(() => {

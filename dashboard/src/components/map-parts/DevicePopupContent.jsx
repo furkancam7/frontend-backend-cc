@@ -1,20 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useUiTranslation } from '../../i18n/useUiTranslation';
 
 const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin }) => {
+  const { t } = useUiTranslation(['mapPopup', 'common']);
   const [editingAddress, setEditingAddress] = useState(false);
   const [newAddress, setNewAddress] = useState('');
   const deviceId = device?.id;
   const deviceAddress = device?.location?.address;
 
   useEffect(() => {
-    setNewAddress(deviceAddress || 'Unknown Location');
+    setNewAddress(deviceAddress || t('mapPopup.unknownLocation'));
     setEditingAddress(false);
-  }, [deviceId, deviceAddress]);
+  }, [deviceId, deviceAddress, t]);
 
   const isOnline = device?.online ?? false;
   const lastSeenTime = device?.lastSeen
     ? new Date(device.lastSeen).toLocaleTimeString()
-    : 'N/A';
+    : t('mapPopup.na');
   const lat = device?.location?.latitude;
   const lng = device?.location?.longitude;
   const isHub = deviceId?.toLowerCase().includes('hub');
@@ -51,14 +53,14 @@ const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin })
               ? 'bg-green-500/20 text-green-400 border border-green-500/30'
               : 'bg-red-500/20 text-red-400 border border-red-500/30'
             }`}>
-            {isOnline ? '● ONLINE' : '○ OFFLINE'}
+            {isOnline ? `● ${t('common.online')}` : `○ ${t('common.offline')}`}
           </div>
         </div>
       </div>
 
       <div className="p-3 space-y-3">
         <div className="bg-[#0d0d0d] rounded-lg p-2.5 border border-gray-800/50">
-          <div className="text-gray-500 text-[8px] font-bold tracking-widest mb-1.5">LOCATION</div>
+          <div className="text-gray-500 text-[8px] font-bold tracking-widest mb-1.5">{t('mapPopup.location')}</div>
           {editingAddress ? (
             <input
               autoFocus
@@ -70,7 +72,7 @@ const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin })
                 if (e.key === 'Escape') setEditingAddress(false);
               }}
               className="bg-black text-white border border-cyan-500/50 w-full text-[10px] outline-none rounded px-1.5 py-0.5"
-              aria-label="Edit location address"
+              aria-label={t('mapPopup.editLocationAddress')}
             />
           ) : (
             <div
@@ -84,13 +86,13 @@ const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin })
             </div>
           )}
           <div className="text-gray-600 font-mono text-[8px] truncate mt-0.5">
-            {lat != null && lng != null ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'N/A'}
+            {lat != null && lng != null ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : t('mapPopup.na')}
           </div>
         </div>
 
         {/* Last Seen */}
         <div className="flex justify-between items-center text-[9px] px-1">
-          <span className="text-gray-600 font-mono tracking-wider">LAST SEEN</span>
+          <span className="text-gray-600 font-mono tracking-wider">{t('mapPopup.lastSeen')}</span>
           <span className="text-gray-400 font-mono">{lastSeenTime}</span>
         </div>
 
@@ -98,7 +100,7 @@ const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin })
         {!isHub && (
           <div className="bg-[#0d0d0d] rounded-lg p-2.5 border border-gray-800/50">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-gray-500 text-[8px] font-bold tracking-widest">RECENT DETECTIONS</span>
+              <span className="text-gray-500 text-[8px] font-bold tracking-widest">{t('mapPopup.recentDetections')}</span>
               <span className="text-cyan-400 text-[10px] font-mono font-bold bg-cyan-500/10 px-1.5 py-0.5 rounded">
                 {deviceCrops.length}
               </span>
@@ -110,12 +112,12 @@ const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin })
                     key={crop.crop_id || crop.detection_id || `${crop.timestamp}-${crop.class}`}
                     onClick={(e) => { e.stopPropagation(); onCropSelect?.(crop); }}
                     className="cursor-pointer relative min-w-[2.75rem] w-11 h-11 bg-black border border-gray-700/50 rounded-lg overflow-hidden hover:border-cyan-500/70 hover:shadow-lg hover:shadow-cyan-500/10 transition-all shrink-0 p-0 group"
-                    aria-label={`View ${crop.class || 'detection'} details`}
+                    aria-label={t('mapPopup.viewDetectionDetails', { className: crop.class || t('mapPopup.detection') })}
                   >
                     <img
                       src={`/api/image/crop/${crop.crop_id}`}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-                      alt={crop.class || 'Detection'}
+                      alt={crop.class || t('mapPopup.detectionAlt')}
                       loading="lazy"
                       onError={(e) => { e.target.style.opacity = '0'; }}
                     />
@@ -131,7 +133,7 @@ const DevicePopupContent = ({ device, deviceCrops = [], onCropSelect, isAdmin })
                 )}
               </div>
             ) : (
-              <div className="text-gray-600 text-[9px] italic py-2 text-center">No detections yet</div>
+              <div className="text-gray-600 text-[9px] italic py-2 text-center">{t('mapPopup.noDetectionsYet')}</div>
             )}
           </div>
         )}

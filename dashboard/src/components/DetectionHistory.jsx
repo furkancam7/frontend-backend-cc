@@ -1,4 +1,7 @@
 import React, { useState, useMemo, memo, useRef, useCallback, useEffect } from 'react';
+import { useUiTranslation } from '../i18n/useUiTranslation';
+import { toIntlLocale } from '../i18n/locale';
+import { localizeDetectionClassName } from '../utils/detectionLabels';
 
 const Icon = memo(({ path, className = "w-5 h-5" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,8 +29,8 @@ const getThreatInfo = (cls, accuracy) => {
   return { level, type: 'green', color: '#22c55e' };
 };
 
-const CLASS_OPTIONS = ['All', 'person', 'car', 'truck', 'motorcycle', 'bicycle', 'bus', 'horse', 'camel'];
-const THREAT_OPTIONS = ['All', 'High (Red)', 'Medium (Yellow)', 'Low (Green)'];
+const CLASS_OPTIONS = ['all', 'person', 'car', 'truck', 'motorcycle', 'bicycle', 'bus', 'horse', 'camel'];
+const THREAT_OPTIONS = ['all', 'high', 'medium', 'low'];
 
 function formatDateForInput(date) {
   const y = date.getFullYear();
@@ -37,14 +40,16 @@ function formatDateForInput(date) {
 }
 
 export default function DetectionHistory({ detections = [], onClose, onViewContext, onFlyToDetection }) {
+  const { t, i18n } = useUiTranslation(['detectionHistory']);
+  const locale = toIntlLocale(i18n.resolvedLanguage);
   const today = new Date();
   const weekAgo = new Date(today);
   weekAgo.setDate(weekAgo.getDate() - 7);
 
   const [startDate, setStartDate] = useState(formatDateForInput(weekAgo));
   const [endDate, setEndDate] = useState(formatDateForInput(today));
-  const [classFilter, setClassFilter] = useState('All');
-  const [threatFilter, setThreatFilter] = useState('All');
+  const [classFilter, setClassFilter] = useState('all');
+  const [threatFilter, setThreatFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [position, setPosition] = useState({ x: null, y: null });
   const [isDragging, setIsDragging] = useState(false);
@@ -139,6 +144,7 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
   const filteredDetections = useMemo(() => {
     const start = startDate ? new Date(startDate + 'T00:00:00') : null;
     const end = endDate ? new Date(endDate + 'T23:59:59') : null;
+    const toLowerSafe = (value) => String(value ?? '').toLowerCase();
 
     return detections.filter(d => {
       if (start || end) {
@@ -147,23 +153,23 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
         if (end && dt > end) return false;
       }
 
-      if (classFilter !== 'All') {
-        if (d.class?.toLowerCase() !== classFilter.toLowerCase()) return false;
+      if (classFilter !== 'all') {
+        if (toLowerSafe(d.class) !== toLowerSafe(classFilter)) return false;
       }
 
-      if (threatFilter !== 'All') {
+      if (threatFilter !== 'all') {
         const threat = getThreatInfo(d.class, d.accuracy);
-        if (threatFilter === 'High (Red)' && threat.type !== 'red') return false;
-        if (threatFilter === 'Medium (Yellow)' && threat.type !== 'yellow') return false;
-        if (threatFilter === 'Low (Green)' && threat.type !== 'green') return false;
+        if (threatFilter === 'high' && threat.type !== 'red') return false;
+        if (threatFilter === 'medium' && threat.type !== 'yellow') return false;
+        if (threatFilter === 'low' && threat.type !== 'green') return false;
       }
 
       if (searchTerm) {
-        const term = searchTerm.toLowerCase();
+        const term = toLowerSafe(searchTerm);
         const matches =
-          d.class?.toLowerCase().includes(term) ||
-          d.crop_id?.toLowerCase().includes(term) ||
-          d.device_id?.toLowerCase().includes(term);
+          toLowerSafe(d.class).includes(term) ||
+          toLowerSafe(d.crop_id).includes(term) ||
+          toLowerSafe(d.device_id).includes(term);
         if (!matches) return false;
       }
 
@@ -175,12 +181,12 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
     const groups = {};
     filteredDetections.forEach(d => {
       const dt = new Date(d.captured_time || d.detection_time);
-      const key = dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+      const key = dt.toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' });
       if (!groups[key]) groups[key] = [];
       groups[key].push(d);
     });
     return groups;
-  }, [filteredDetections]);
+  }, [filteredDetections, locale]);
 
   const dateKeys = Object.keys(groupedByDate);
   
@@ -209,8 +215,8 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
       >
         <div className="flex items-center gap-2">
           <Icon path="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" className="w-4 h-4 text-cyan-400" />
-          <span className="text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider">History</span>
-          <span className="hidden sm:inline text-[9px] text-gray-600 ml-1">• drag to move</span>
+          <span className="text-[10px] sm:text-xs font-bold text-white uppercase tracking-wider">{t('detectionHistory.title')}</span>
+          <span className="hidden sm:inline text-[9px] text-gray-600 ml-1">• {t('detectionHistory.dragToMove')}</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-[9px] sm:text-[10px] text-gray-500 font-mono">{filteredDetections.length}</span>
@@ -223,7 +229,7 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
       <div className="p-2 sm:p-3 border-b border-gray-800/50 space-y-2 flex-shrink-0">
         <div className="flex items-center gap-1.5 sm:gap-2">
           <div className="flex-1">
-            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">From</label>
+            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{t('detectionHistory.from')}</label>
             <input
               type="date"
               value={startDate}
@@ -232,7 +238,7 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
             />
           </div>
           <div className="flex-1">
-            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">To</label>
+            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{t('detectionHistory.to')}</label>
             <input
               type="date"
               value={endDate}
@@ -244,30 +250,44 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
 
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
           <div className="w-[calc(50%-0.25rem)] sm:flex-1">
-            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">Class</label>
+            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{t('detectionHistory.class')}</label>
             <select
               value={classFilter}
               onChange={(e) => setClassFilter(e.target.value)}
               className="w-full bg-gray-900 border border-gray-800 rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white focus:border-cyan-800 focus:outline-none appearance-none cursor-pointer"
             >
-              {CLASS_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              {CLASS_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'all' ? t('detectionHistory.all') : option}
+                </option>
+              ))}
             </select>
           </div>
           <div className="w-[calc(50%-0.25rem)] sm:flex-1">
-            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">Threat</label>
+            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{t('detectionHistory.threat')}</label>
             <select
               value={threatFilter}
               onChange={(e) => setThreatFilter(e.target.value)}
               className="w-full bg-gray-900 border border-gray-800 rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white focus:border-cyan-800 focus:outline-none appearance-none cursor-pointer"
             >
-              {THREAT_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+              {THREAT_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option === 'all'
+                    ? t('detectionHistory.all')
+                    : option === 'high'
+                      ? t('detectionHistory.highRed')
+                      : option === 'medium'
+                        ? t('detectionHistory.mediumYellow')
+                        : t('detectionHistory.lowGreen')}
+                </option>
+              ))}
             </select>
           </div>
           <div className="w-full sm:flex-1">
-            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">Search</label>
+            <label className="block text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">{t('detectionHistory.search')}</label>
             <input
               type="text"
-              placeholder="ID, device..."
+              placeholder={t('detectionHistory.searchPlaceholder')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-gray-900 border border-gray-800 rounded px-1.5 sm:px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] text-white placeholder-gray-600 focus:border-cyan-800 focus:outline-none"
@@ -280,7 +300,7 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
         {filteredDetections.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-gray-600">
             <Icon path="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" className="w-8 h-8 mb-2" />
-            <span className="text-xs">No detections found</span>
+            <span className="text-xs">{t('detectionHistory.noDetectionsFound')}</span>
           </div>
         ) : (
           dateKeys.map(dateKey => (
@@ -295,6 +315,8 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
                   crop={crop}
                   onViewContext={onViewContext}
                   onFlyTo={onFlyToDetection}
+                  t={t}
+                  locale={locale}
                 />
               ))}
             </div>
@@ -304,10 +326,10 @@ export default function DetectionHistory({ detections = [], onClose, onViewConte
     </div>
   );
 }
-
-const HistoryRow = memo(({ crop, onViewContext, onFlyTo }) => {
+const HistoryRow = memo(({ crop, onViewContext, onFlyTo, t, locale }) => {
   const threat = getThreatInfo(crop.class, crop.accuracy);
-  const time = new Date(crop.captured_time || crop.detection_time).toLocaleTimeString();
+  const time = new Date(crop.captured_time || crop.detection_time).toLocaleTimeString(locale);
+  const localizedClass = localizeDetectionClassName(crop.class, t);
 
   return (
     <div
@@ -327,7 +349,7 @@ const HistoryRow = memo(({ crop, onViewContext, onFlyTo }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${THREAT_COLORS[threat.type]}`} />
-          <span className="text-[11px] font-semibold text-white uppercase">{crop.class}</span>
+          <span className="text-[11px] font-semibold text-white uppercase">{localizedClass}</span>
           <span className="text-[9px] text-gray-500 font-mono">{time}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5">
@@ -353,7 +375,7 @@ const HistoryRow = memo(({ crop, onViewContext, onFlyTo }) => {
         <button
           onClick={(e) => { e.stopPropagation(); onFlyTo?.(crop); }}
           className="p-1 rounded text-gray-600 hover:text-cyan-400 opacity-0 group-hover:opacity-100 transition-all"
-          title="Fly to location"
+          title={t('detectionHistory.flyToLocation')}
         >
           <Icon path="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z M15 11a3 3 0 11-6 0 3 3 0 016 0z" className="w-3.5 h-3.5" />
         </button>

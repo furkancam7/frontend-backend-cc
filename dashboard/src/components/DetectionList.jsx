@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import useTransferUpdates from '../hooks/useTransferUpdates';
-import { usePreferences } from '../context/PreferencesContext';
+import { useUiTranslation } from '../i18n/useUiTranslation';
+import { toIntlLocale } from '../i18n/locale';
+import { localizeDetectionClassName } from '../utils/detectionLabels';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
 const FALLBACK_THUMBNAIL_URL = 'https://placehold.co/100x100/000000/FFF?text=No+Img';
@@ -148,6 +150,7 @@ const DetectionItem = memo(({
     t,
     locale
 }) => {
+    const localizedClass = useMemo(() => localizeDetectionClassName(crop.class, t), [crop.class, t]);
     const [localForm, setLocalForm] = useState({
         class: crop.class || '',
         device_id: crop.device_id || '',
@@ -269,7 +272,7 @@ const DetectionItem = memo(({
                                             {t('detectionList.partial')}
                                         </span>
                                     )}
-                                    <h3 className="text-sm font-bold text-gray-200 group-hover:text-cyan-400 truncate capitalize transition-colors">{crop.class}</h3>
+                                    <h3 className="text-sm font-bold text-gray-200 group-hover:text-cyan-400 truncate capitalize transition-colors">{localizedClass}</h3>
                                     <p className="text-[10px] text-gray-500 font-mono truncate">{t('detectionList.deviceLabel')}: {crop.device_id}</p>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
@@ -321,7 +324,7 @@ const DetectionItem = memo(({
                                         onClick={handleMapClick}
                                         onKeyDown={handleMapKeyDown}
                                         title={t('detectionList.clickToViewOnMap')}
-                                        aria-label={t('detectionList.viewDetectionOnMap', { lat: crop.location.latitude, lng: crop.location.longitude })}
+                                        aria-label={t('detectionList.viewDetectionOnMap', { lat: crop.location.latitude, longitude: crop.location.longitude })}
                                     >
                                         <DetectionMiniMap
                                             latitude={crop.location.latitude}
@@ -361,7 +364,8 @@ function DetectionList({
     isAdmin,
     isActive = true
 }) {
-    const { t, locale } = usePreferences();
+    const { t, i18n } = useUiTranslation(['detectionList', 'dataTable']);
+    const locale = toIntlLocale(i18n.resolvedLanguage);
     const [filter, setFilter] = useState('');
     const [editingId, setEditingId] = useState(null);
     const ITEM_HEIGHT = 106;
@@ -394,9 +398,10 @@ function DetectionList({
 
     const filteredDetections = useMemo(() => {
         const lowerFilter = filter.toLowerCase();
+        const toLowerSafe = (value) => String(value ?? '').toLowerCase();
         return detections.filter(d =>
-            d.class.toLowerCase().includes(lowerFilter) ||
-            (d.device_id && d.device_id.toLowerCase().includes(lowerFilter))
+            toLowerSafe(d.class).includes(lowerFilter) ||
+            toLowerSafe(d.device_id).includes(lowerFilter)
         );
     }, [detections, filter]);
 
@@ -435,7 +440,7 @@ function DetectionList({
     }, [onUpdate]);
 
     const handleDelete = useCallback(async (crop) => {
-        if (window.confirm(t('detectionList.deleteConfirm', { className: crop.class }))) {
+        if (window.confirm(t('detectionList.deleteConfirm', { className: localizeDetectionClassName(crop.class, t) }))) {
             try {
                 await fetch(`/api/crop/${crop.crop_id}`, {
                     method: 'DELETE',

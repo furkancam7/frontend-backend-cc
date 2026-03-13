@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import ImageCanvas from './ImageCanvas';
 import DetectionSidebar from './DetectionSidebar';
 import useTransferUpdates from '../hooks/useTransferUpdates';
+import { useUiTranslation } from '../i18n/useUiTranslation';
 
 export default function DetectionDetailView({
     recordId,
@@ -11,6 +12,7 @@ export default function DetectionDetailView({
     isAdmin,
     onRefresh
 }) {
+    const { t } = useUiTranslation(['detectionDetail']);
     const [selectedCrop, setSelectedCrop] = useState(null);
     const [showBbox, setShowBbox] = useState(true);
     const { activeTransfers } = useTransferUpdates(!!recordId);
@@ -89,7 +91,7 @@ export default function DetectionDetailView({
                     <button
                         onClick={() => setShowBbox(prev => !prev)}
                         className={`absolute top-3 left-3 z-30 w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${showBbox ? 'bg-cyan-900/80 border-cyan-500 text-cyan-300' : 'bg-gray-900/80 border-gray-600 text-gray-400 hover:text-white'}`}
-                        title={showBbox ? 'Hide bounding box' : 'Show bounding box'}
+                        title={showBbox ? t('detectionDetail.hideBoundingBox') : t('detectionDetail.showBoundingBox')}
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             {showBbox ? (

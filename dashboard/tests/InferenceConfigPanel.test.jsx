@@ -4,10 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import InferenceConfigPanel from '../src/components/InferenceConfigPanel';
 
-const apiMock = {
+const apiMock = vi.hoisted(() => ({
   getInferenceConfig: vi.fn(),
   publishInferenceConfig: vi.fn(),
-};
+}));
 
 vi.mock('../src/services/api', () => ({
   default: apiMock,

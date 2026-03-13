@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import useTransferUpdates from '../hooks/useTransferUpdates';
-import { usePreferences } from '../context/PreferencesContext';
+import { useUiTranslation } from '../i18n/useUiTranslation';
+import { toIntlLocale } from '../i18n/locale';
+import { localizeDetectionClassName } from '../utils/detectionLabels';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
 
@@ -122,8 +124,9 @@ const LocationCell = React.memo(({ location, row, onViewOnMap, t }) => {
     );
 });
 
-const CropItem = React.memo(({ crop, isAdmin, editingCropId, setEditingCropId, onUpdateCrop }) => {
+const CropItem = React.memo(({ crop, isAdmin, editingCropId, setEditingCropId, onUpdateCrop, t }) => {
     const [editVal, setEditVal] = useState(crop.class);
+    const localizedClass = useMemo(() => localizeDetectionClassName(crop.class, t), [crop.class, t]);
     
     useEffect(() => {
         setEditVal(crop.class);
@@ -132,10 +135,10 @@ const CropItem = React.memo(({ crop, isAdmin, editingCropId, setEditingCropId, o
     const handleSave = () => onUpdateCrop(crop.crop_id, editVal);
 
     return (
-        <div className="w-12 h-12 flex-shrink-0 bg-black rounded border border-gray-700 relative group cursor-help" title={`${crop.class} (${crop.accuracy}%)`}>
+        <div className="w-12 h-12 flex-shrink-0 bg-black rounded border border-gray-700 relative group cursor-help" title={`${localizedClass} (${crop.accuracy}%)`}>
             <img
                 src={`/api/image/crop/${crop.crop_id}`}
-                alt={crop.class}
+                alt={localizedClass}
                 className="w-full h-full object-cover"
                 onError={(e) => {
                     e.target.onerror = null;
@@ -167,14 +170,14 @@ const CropItem = React.memo(({ crop, isAdmin, editingCropId, setEditingCropId, o
                         }
                     }}
                 >
-                    {crop.class} {isAdmin && <span className="text-cyan-500 ml-0.5">✎</span>}
+                    {localizedClass} {isAdmin && <span className="text-cyan-500 ml-0.5">✎</span>}
                 </div>
             )}
         </div>
     );
 });
 
-const CropsCell = React.memo(({ crops, isAdmin, editingCropId, setEditingCropId, onUpdateCrop }) => {
+const CropsCell = React.memo(({ crops, isAdmin, editingCropId, setEditingCropId, onUpdateCrop, t }) => {
     return (
         <div className="flex gap-2 overflow-x-auto max-w-xs custom-scrollbar pb-1">
             {crops.map(crop => (
@@ -185,6 +188,7 @@ const CropsCell = React.memo(({ crops, isAdmin, editingCropId, setEditingCropId,
                     editingCropId={editingCropId}
                     setEditingCropId={setEditingCropId}
                     onUpdateCrop={onUpdateCrop}
+                    t={t}
                 />
             ))}
         </div>
@@ -246,7 +250,8 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
 });
 
 function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefresh, isActive = true }) {
-    const { t, locale } = usePreferences();
+    const { t, i18n } = useUiTranslation(['dataTable']);
+    const locale = toIntlLocale(i18n.resolvedLanguage);
     const [editingCropId, setEditingCropId] = useState(null);
     const [editingRecordId, setEditingRecordId] = useState(null);
     const { activeTransfers } = useTransferUpdates(isActive);
@@ -387,6 +392,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                             editingCropId={editingCropId}
                                             setEditingCropId={setEditingCropId}
                                             onUpdateCrop={handleUpdateCrop}
+                                            t={t}
                                         />
                                     </td>
 
