@@ -61,7 +61,7 @@ export default function DetectionDetailView({
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-black overflow-auto md:overflow-hidden">
+        <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-[var(--bg-app)] overflow-auto md:overflow-hidden">
             {}
             <div className="absolute top-2 right-2 md:top-0 md:left-0 md:right-96 z-50 md:p-4 flex justify-end md:justify-between items-start pointer-events-none">
                 <div className="pointer-events-auto hidden md:block">
@@ -69,7 +69,7 @@ export default function DetectionDetailView({
                 </div>
                 <button
                     onClick={onClose}
-                    className="pointer-events-auto bg-black/70 hover:bg-red-900/80 text-white rounded-full p-2 transition-colors border border-white/20"
+                    className="pointer-events-auto bg-[var(--bg-panel)]/90 hover:bg-red-900/80 text-[var(--text-main)] rounded-full p-2 transition-colors border border-[var(--border-color)]"
                 >
                     <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -78,7 +78,7 @@ export default function DetectionDetailView({
             </div>
 
             {}
-            <div className="relative bg-[#0a0a0a] h-[35vh] md:h-auto md:flex-1 flex-shrink-0">
+            <div className="relative bg-[var(--bg-deep)] h-[35vh] md:h-auto md:flex-1 flex-shrink-0">
                 <ImageCanvas
                     recordId={recordId}
                     isPartial={isPartial}
@@ -90,7 +90,7 @@ export default function DetectionDetailView({
                 {selectedCrop && (
                     <button
                         onClick={() => setShowBbox(prev => !prev)}
-                        className={`absolute top-3 left-3 z-30 w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${showBbox ? 'bg-cyan-900/80 border-cyan-500 text-cyan-300' : 'bg-gray-900/80 border-gray-600 text-gray-400 hover:text-white'}`}
+                        className={`absolute top-3 left-3 z-30 w-8 h-8 flex items-center justify-center rounded-lg border transition-all ${showBbox ? 'bg-cyan-900/80 border-cyan-500 text-cyan-300' : 'bg-[var(--bg-panel)]/90 border-[var(--border-color)] text-[var(--text-muted)] hover:text-[var(--text-main)]'}`}
                         title={showBbox ? t('detectionDetail.hideBoundingBox') : t('detectionDetail.showBoundingBox')}
                     >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,7 +105,7 @@ export default function DetectionDetailView({
             </div>
 
             {}
-            <div className="w-full md:w-96 flex-shrink-0 z-20 md:h-full bg-[#0f0f0f] overflow-auto">
+            <div className="w-full md:w-96 flex-shrink-0 z-20 md:h-full bg-[var(--bg-panel)] overflow-auto">
                 <DetectionSidebar
                     recordId={recordId}
                     detections={recordCrops}

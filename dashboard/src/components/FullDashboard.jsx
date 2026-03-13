@@ -412,7 +412,7 @@ export default function FullDashboard({ detections = [], onClose, onViewContext,
             attributionControl: false
         });
 
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-left');
+        map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
 
         map.current.on('load', () => {
             if (mapEventsBoundRef.current) return; 

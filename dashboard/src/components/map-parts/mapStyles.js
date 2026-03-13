@@ -82,7 +82,7 @@ export const MAP_STYLES = `
     position: absolute;
     inset: 0;
     pointer-events: none;
-    border: 1px solid rgba(6, 182, 212, 0.1);
+    border: 1px solid rgba(252,88,28,0.1);
   }
 
   .tactical-footer {
@@ -113,10 +113,10 @@ export const MAP_STYLES = `
       border-radius: 2px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-      background: #06b6d4;
+      background: #10302C;
       border-radius: 2px;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-      background: #22d3ee;
+      background: #FC581C;
   }
 `;

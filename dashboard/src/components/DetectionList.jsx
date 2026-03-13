@@ -20,13 +20,13 @@ const TransferProgressBar = memo(({ percent, label, subLabel }) => (
         {(label || subLabel) && (
             <div className="flex justify-between text-[10px] mb-1">
                 {label && <span className="text-cyan-400 flex items-center gap-1">{label}</span>}
-                {subLabel && <span className="text-gray-400 font-mono">{subLabel}</span>}
+                {subLabel && <span className="text-[var(--text-muted)] font-mono">{subLabel}</span>}
                 <span className="text-cyan-400 font-mono ml-auto">{percent}%</span>
             </div>
         )}
-        <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[var(--bg-input)] rounded-full overflow-hidden">
             <div
-                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-cyan-500 to-cyan-900 transition-all duration-300"
                 style={{ width: `${percent}%` }}
             />
         </div>
@@ -37,7 +37,7 @@ const TransferProgressBanner = memo(({ transfers, t }) => {
     if (!transfers || transfers.length === 0) return null;
 
     return (
-        <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border-b border-cyan-500/30 p-3">
+        <div className="bg-gradient-to-r from-cyan-900/30 to-cyan-900/30 border-b border-cyan-500/30 p-3">
             <div className="text-xs text-cyan-400 font-semibold mb-2 flex items-center gap-2">
                 <span className="animate-pulse text-lg">●</span>
                 {t('detectionList.activeTransfer')} {transfers.length > 1 ? `(${transfers.length})` : ''}
@@ -45,7 +45,7 @@ const TransferProgressBanner = memo(({ transfers, t }) => {
             {transfers.map(transfer => (
                 <div key={transfer.transfer_id} className="mb-2 last:mb-0">
                     <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-300 truncate max-w-[150px]">{transfer.filename}</span>
+                        <span className="text-[var(--text-main)] truncate max-w-[150px]">{transfer.filename}</span>
                     </div>
                     <TransferProgressBar
                         percent={transfer.percent}
@@ -73,7 +73,7 @@ const DetectionMiniMap = memo(({ latitude, longitude, t }) => {
     }, [staticMapUrl]);
 
     return (
-        <div className="w-full h-full rounded overflow-hidden relative bg-gray-900 border border-gray-700/50">
+        <div className="w-full h-full rounded overflow-hidden relative bg-[var(--bg-input)] border border-[var(--border-color)]">
             {!imgError ? (
                 <img
                     src={staticMapUrl}
@@ -83,8 +83,8 @@ const DetectionMiniMap = memo(({ latitude, longitude, t }) => {
                     onError={() => setImgError(true)}
                 />
             ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gray-800/50">
-                    <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="w-full h-full flex items-center justify-center bg-[var(--bg-hover)]/70">
+                    <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                 </div>
@@ -108,7 +108,7 @@ const DetectionThumbnail = memo(({ src, crop, onOpenDetail, onViewContext, t }) 
 
     return (
         <div
-            className="relative w-20 h-20 bg-black rounded overflow-hidden border border-gray-800 flex-shrink-0 group-hover:border-cyan-900/50 transition-colors cursor-pointer"
+            className="relative w-20 h-20 bg-[var(--bg-input)] rounded overflow-hidden border border-[var(--border-color)] flex-shrink-0 group-hover:border-cyan-600/60 transition-colors cursor-pointer"
             onClick={(e) => {
                 e.stopPropagation();
                 onOpenDetail?.(crop.record_id);
@@ -126,7 +126,7 @@ const DetectionThumbnail = memo(({ src, crop, onOpenDetail, onViewContext, t }) 
             </div>
             <button
                 onClick={(e) => { e.stopPropagation(); onViewContext(crop); }}
-                className="absolute bottom-0.5 right-0.5 w-5 h-5 bg-black/80 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-600"
+                className="absolute bottom-0.5 right-0.5 w-5 h-5 bg-[var(--bg-panel)]/90 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-600"
                 title={t('detectionList.viewContext')}
             >
                 <svg className="w-3 h-3 text-cyan-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
@@ -209,7 +209,7 @@ const DetectionItem = memo(({
 
     return (
         <div
-            className={`group bg-black hover:bg-gray-950 border border-gray-900 hover:border-gray-800 rounded-xl p-2.5 transition-all duration-200 relative ${isEditing ? 'h-auto min-h-[98px] z-50 shadow-2xl ring-1 ring-gray-700 overflow-visible' : 'h-[98px] overflow-hidden'
+            className={`group bg-[var(--bg-panel)] hover:bg-[var(--bg-hover)] border border-[var(--border-color)] hover:border-cyan-600/50 rounded-xl p-2.5 transition-all duration-200 relative ${isEditing ? 'h-auto min-h-[98px] z-50 shadow-xl ring-1 ring-cyan-600/30 overflow-visible' : 'h-[98px] overflow-hidden'
                 }`}
             onClick={handleSelect}
         >
@@ -234,7 +234,7 @@ const DetectionItem = memo(({
                                     type="text"
                                     value={localForm.class}
                                     onChange={e => setLocalForm(prev => ({ ...prev, class: e.target.value }))}
-                                    className="flex-[2] bg-black border border-gray-700 rounded px-1 text-[10px] h-6 text-white focus:border-cyan-500 outline-none"
+                                    className="flex-[2] bg-[var(--bg-input)] border border-[var(--border-color)] rounded px-1 text-[10px] h-6 text-[var(--text-main)] focus:border-cyan-500 outline-none"
                                     placeholder={t('detectionList.classPlaceholder')}
                                     autoFocus
                                 />
@@ -242,7 +242,7 @@ const DetectionItem = memo(({
                                     type="number"
                                     value={localForm.accuracy}
                                     onChange={e => setLocalForm(prev => ({ ...prev, accuracy: e.target.value }))}
-                                    className="w-10 bg-black border border-gray-700 rounded px-1 text-[10px] h-6 text-white focus:border-cyan-500 outline-none text-center"
+                                    className="w-10 bg-[var(--bg-input)] border border-[var(--border-color)] rounded px-1 text-[10px] h-6 text-[var(--text-main)] focus:border-cyan-500 outline-none text-center"
                                     placeholder="%"
                                 />
                             </div>
@@ -250,7 +250,7 @@ const DetectionItem = memo(({
                                 type="text"
                                 value={localForm.device_id}
                                 onChange={e => setLocalForm(prev => ({ ...prev, device_id: e.target.value }))}
-                                className="w-full bg-black border border-gray-700 rounded px-1 text-[10px] h-6 text-white focus:border-cyan-500 outline-none"
+                                className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded px-1 text-[10px] h-6 text-[var(--text-main)] focus:border-cyan-500 outline-none"
                                 placeholder={t('detectionList.deviceIdPlaceholder')}
                             />
                             <div className="flex gap-1 mt-auto">
@@ -272,11 +272,11 @@ const DetectionItem = memo(({
                                             {t('detectionList.partial')}
                                         </span>
                                     )}
-                                    <h3 className="text-sm font-bold text-gray-200 group-hover:text-cyan-400 truncate capitalize transition-colors">{localizedClass}</h3>
-                                    <p className="text-[10px] text-gray-500 font-mono truncate">{t('detectionList.deviceLabel')}: {crop.device_id}</p>
+                                    <h3 className="text-sm font-bold text-[var(--text-main)] group-hover:text-cyan-500 truncate capitalize transition-colors">{localizedClass}</h3>
+                                    <p className="text-[10px] text-[var(--text-muted)] font-mono truncate">{t('detectionList.deviceLabel')}: {crop.device_id}</p>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-black text-white border-gray-700">
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-[var(--bg-input)] text-[var(--text-main)] border-[var(--border-color)]">
                                         {crop.accuracy}%
                                     </span>
                                     {isAdmin && (
@@ -302,16 +302,16 @@ const DetectionItem = memo(({
 
                             <div className="flex gap-2 mt-2">
                                 <div className="flex flex-col gap-0.5 flex-1">
-                                    <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                                    <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                        <span className="font-mono text-gray-400">
+                                        <span className="font-mono text-[var(--text-main)]">
                                             {crop.location && typeof crop.location.latitude === 'number'
                                                 ? `${crop.location.latitude.toFixed(4)}, ${crop.location.longitude.toFixed(4)}`
-                                                : <span className="text-gray-600 italic">{t('detectionList.noSignal')}</span>
+                                                : <span className="text-[var(--text-muted)] italic">{t('detectionList.noSignal')}</span>
                                             }
                                         </span>
                                     </div>
-                                    <div className="flex items-center gap-1 text-[10px] text-gray-600">
+                                    <div className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                         <span>{new Date(crop.captured_time).toLocaleTimeString(locale)}</span>
                                     </div>
@@ -320,7 +320,7 @@ const DetectionItem = memo(({
                                     <div
                                         role="button"
                                         tabIndex={0}
-                                        className="w-16 h-10 rounded overflow-hidden border border-gray-700 hover:border-cyan-500 cursor-pointer transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-sm"
+                                        className="w-16 h-10 rounded overflow-hidden border border-[var(--border-color)] hover:border-cyan-500 cursor-pointer transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-sm"
                                         onClick={handleMapClick}
                                         onKeyDown={handleMapKeyDown}
                                         title={t('detectionList.clickToViewOnMap')}
@@ -483,13 +483,13 @@ function DetectionList({
     });
 
     return (
-        <div className="h-full flex flex-col bg-black">
+        <div className="h-full flex flex-col bg-[var(--bg-panel)] text-[var(--text-main)]">
             <TransferProgressBanner transfers={activeTransfers} t={t} />
 
             {/* Header */}
-            <div className="p-4 border-b border-gray-900 flex flex-col gap-3 bg-black sticky top-0 z-10">
+            <div className="p-4 border-b border-[var(--border-color)] flex flex-col gap-3 bg-[var(--bg-panel-header)] sticky top-0 z-10">
                 <div className="flex justify-between items-center">
-                    <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+                    <h2 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full"></span>
                         <span className="text-cyan-400 font-mono">{filteredDetections.length}</span> {t('detectionList.detections')}
                     </h2>
@@ -502,9 +502,9 @@ function DetectionList({
                         placeholder={t('detectionList.filterPlaceholder')}
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
-                        className="w-full bg-gray-950 border border-gray-900 rounded-lg px-3 py-2 text-xs text-gray-300 focus:border-gray-700 focus:outline-none transition-colors placeholder-gray-700"
+                        className="w-full bg-[var(--bg-input)] border border-[var(--border-color)] rounded-lg px-3 py-2 text-xs text-[var(--text-main)] focus:border-cyan-600/60 focus:outline-none transition-colors placeholder-[var(--text-muted)]"
                     />
-                    <svg className="w-3.5 h-3.5 text-gray-700 absolute right-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    <svg className="w-3.5 h-3.5 text-[var(--text-muted)] absolute right-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
             </div>
 
@@ -547,7 +547,7 @@ function DetectionList({
                 </div>
 
                 {filteredDetections.length === 0 && (
-                    <div className="text-center py-10 text-gray-600 text-xs absolute top-0 w-full">
+                    <div className="text-center py-10 text-[var(--text-muted)] text-xs absolute top-0 w-full">
                         {t('detectionList.noDetectionsFound')}
                     </div>
                 )}

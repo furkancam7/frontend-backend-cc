@@ -129,14 +129,14 @@ const TacticalCompass = ({ value, onChange, disabled }) => {
           <div className="absolute left-1/2 -translate-x-1/2 top-1 w-0 h-0 
             border-l-[4px] border-r-[4px] border-b-[24px] 
             border-l-transparent border-r-transparent border-b-cyan-400
-            drop-shadow-[0_0_6px_rgba(34,211,238,0.6)]" 
+            drop-shadow-[0_0_6px_rgba(252,88,28,0.6)]" 
           />
           {/* Tail line */}
           <div className="absolute left-1/2 -translate-x-1/2 bottom-4 w-px h-8 bg-gradient-to-t from-transparent to-cyan-600/50" />
         </div>
         
         {/* Center */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_rgba(252,88,28,0.8)]" />
       </div>
       
       {/* Digital readout */}

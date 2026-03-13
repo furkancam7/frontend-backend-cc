@@ -53,7 +53,7 @@ const EditableField = memo(({
                         e.stopPropagation();
                         onStartEdit(field);
                     }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-cyan-500 text-xs transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-cyan-500 text-xs transition-opacity"
                 >
                     ✎
                 </button>
@@ -76,9 +76,9 @@ const DetectionItem = memo(({ crop, isSelected, isAdmin, editingField, onSelect,
     return (
         <div
             onClick={() => onSelect(crop)}
-            className={`relative flex items-center gap-3 p-3 rounded border cursor-pointer transition-all group ${isSelected ? 'bg-gray-800 border-cyan-500 ring-1 ring-cyan-500' : 'bg-[#18181b] border-gray-700 hover:border-gray-600'}`}
+            className={`relative flex items-center gap-3 p-3 rounded border cursor-pointer transition-all group ${isSelected ? 'bg-[var(--bg-hover)] border-cyan-500 ring-1 ring-cyan-500' : 'bg-[var(--bg-panel)] border-[var(--border-color)] hover:border-cyan-600/50'}`}
         >
-            <div className="w-16 h-16 bg-black rounded overflow-hidden flex-shrink-0 border border-gray-700">
+            <div className="w-16 h-16 bg-[var(--bg-input)] rounded overflow-hidden flex-shrink-0 border border-[var(--border-color)]">
                 <img
                     src={`/api/image/crop/${crop.crop_id}`}
                     loading="lazy"
@@ -97,9 +97,9 @@ const DetectionItem = memo(({ crop, isSelected, isAdmin, editingField, onSelect,
                         onStartEdit={handleStartEdit}
                         onSave={handleSave}
                         onCancel={onEditCancel}
-                        inputClassName="bg-black text-white border border-cyan-500 w-24 px-1 outline-none text-sm font-bold"
+                        inputClassName="bg-[var(--bg-input)] text-[var(--text-main)] border border-cyan-500 w-24 px-1 outline-none text-sm font-bold"
                     >
-                        <span className="text-base font-bold text-white truncate">{localizedClass}</span>
+                        <span className="text-base font-bold text-[var(--text-main)] truncate">{localizedClass}</span>
                     </EditableField>
 
                     { }
@@ -111,14 +111,14 @@ const DetectionItem = memo(({ crop, isSelected, isAdmin, editingField, onSelect,
                         onStartEdit={handleStartEdit}
                         onSave={handleSave}
                         onCancel={onEditCancel}
-                        inputClassName="bg-black text-white border border-cyan-500 w-12 px-1 outline-none text-xs font-mono text-right"
+                        inputClassName="bg-[var(--bg-input)] text-[var(--text-main)] border border-cyan-500 w-12 px-1 outline-none text-xs font-mono text-right"
                     >
                         <span className={`text-xs font-mono ${crop.accuracy > 80 ? 'text-green-400' : 'text-yellow-400'}`}>
                             {crop.accuracy}%
                         </span>
                     </EditableField>
                 </div>
-                <div className="text-xs text-gray-500 font-mono truncate">
+                <div className="text-xs text-[var(--text-muted)] font-mono truncate">
                     {t('detectionDetail.idPrefix')}: {String(crop.crop_id).substring(0, 8)}...
                 </div>
             </div>
@@ -196,7 +196,7 @@ export default function DetectionSidebar({
     const isEditingRecord = editMode?.id === 'record';
 
     return (
-        <div className="flex flex-col md:h-full border-l border-gray-800 bg-[#0f0f0f]">
+        <div className="flex flex-col md:h-full border-l border-[var(--border-color)] bg-[var(--bg-panel)] text-[var(--text-main)]">
             { }
             {detectionTransferStatus?.status === 'receiving' && detectionTransferStatus?.transfer && (
                 <div className="p-3 border-b border-cyan-500/30 bg-gradient-to-r from-cyan-900/20 to-transparent">
@@ -204,9 +204,9 @@ export default function DetectionSidebar({
                         <span className="animate-pulse text-cyan-400">●</span>
                         <span className="text-xs font-bold text-cyan-400">{t('detectionDetail.imageTransferInProgress')}</span>
                     </div>
-                    <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-[var(--bg-input)] rounded-full overflow-hidden">
                         <div
-                            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
+                            className="h-full bg-gradient-to-r from-cyan-500 to-cyan-900 transition-all duration-300"
                             style={{ width: `${detectionTransferStatus.transfer.percent}%` }}
                         />
                     </div>
@@ -214,14 +214,14 @@ export default function DetectionSidebar({
             )}
 
             { }
-            <div className="p-4 border-b border-gray-800 bg-[#18181b] space-y-4">
+            <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-panel-header)] space-y-4">
                 {metadata ? (
                     <>
                         <div>
-                            <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">{t('detectionDetail.deviceInfo')}</h3>
+                            <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">{t('detectionDetail.deviceInfo')}</h3>
                             <div className="grid grid-cols-1 gap-2 text-sm">
                                 <div>
-                                    <span className="text-gray-500 block text-xs">{t('detectionDetail.deviceId')}</span>
+                                    <span className="text-[var(--text-muted)] block text-xs">{t('detectionDetail.deviceId')}</span>
                                     {isAdmin && isEditingRecord ? (
                                         <input
                                             autoFocus
@@ -232,7 +232,7 @@ export default function DetectionSidebar({
                                                 if (e.key === 'Enter') handleSave(recordId, 'device_id', editValue);
                                                 if (e.key === 'Escape') setEditMode(null);
                                             }}
-                                            className="bg-black text-white border border-cyan-500 w-full px-1 outline-none font-mono font-bold"
+                                            className="bg-[var(--bg-input)] text-[var(--text-main)] border border-cyan-500 w-full px-1 outline-none font-mono font-bold"
                                         />
                                     ) : (
                                         <div className="flex items-center gap-2 group">
@@ -243,7 +243,7 @@ export default function DetectionSidebar({
                                                         setEditMode({ id: 'record', field: 'device_id' });
                                                         setEditValue(metadata.device_id || metadata.solo_id || '');
                                                     }}
-                                                    className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-cyan-500"
+                                                    className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-cyan-500"
                                                 >
 
                                                 </button>
@@ -255,22 +255,22 @@ export default function DetectionSidebar({
                         </div>
 
                         <div>
-                            <h3 className="text-xs font-bold text-gray-500 uppercase mb-2">{t('detectionDetail.location')}</h3>
+                            <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">{t('detectionDetail.location')}</h3>
                             <div className="space-y-1">
                                 <div className="flex justify-between text-sm">
-                                    <span className="text-gray-500">{t('detectionDetail.coordinates')}:</span>
-                                    <span className="text-gray-300 font-mono">
+                                    <span className="text-[var(--text-muted)]">{t('detectionDetail.coordinates')}:</span>
+                                    <span className="text-[var(--text-main)] font-mono">
                                         {metadata.location ? `${metadata.location.latitude?.toFixed(5)}, ${metadata.location.longitude?.toFixed(5)}` : t('detectionDetail.na')}
                                     </span>
                                 </div>
                                 {metadata.location?.address && (
-                                    <div className="text-xs text-gray-400 truncate" title={metadata.location.address}>
+                                    <div className="text-xs text-[var(--text-muted)] truncate" title={metadata.location.address}>
                                         {metadata.location.address}
                                     </div>
                                 )}
 
                                 {metadata.location && metadata.location.latitude && (
-                                    <div className="mt-3 w-full h-24 bg-black rounded overflow-hidden border border-gray-800 relative group">
+                                    <div className="mt-3 w-full h-24 bg-[var(--bg-input)] rounded overflow-hidden border border-[var(--border-color)] relative group">
                                         <img
                                             src={`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/pin-s+06b6d4(${metadata.location.longitude},${metadata.location.latitude})/${metadata.location.longitude},${metadata.location.latitude},12,0/300x200?access_token=${MAPBOX_TOKEN}`}
                                             alt={t('detectionDetail.locationAlt')}
@@ -297,18 +297,18 @@ export default function DetectionSidebar({
                         </div>
                     </>
                 ) : (
-                    <div className="text-gray-500 text-sm">{t('detectionDetail.noRecordInformation')}</div>
+                    <div className="text-[var(--text-muted)] text-sm">{t('detectionDetail.noRecordInformation')}</div>
                 )}
             </div>
 
-            <div className="p-4 border-b border-gray-800 bg-[#18181b]">
-                <h3 className="font-bold text-white mb-1">{t('detectionDetail.detectedObjects')}</h3>
-                <p className="text-sm text-gray-500">{t('detectionDetail.objectsFoundInFrame', { count: detections.length })}</p>
+            <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-panel-header)]">
+                <h3 className="font-bold text-[var(--text-main)] mb-1">{t('detectionDetail.detectedObjects')}</h3>
+                <p className="text-sm text-[var(--text-muted)]">{t('detectionDetail.objectsFoundInFrame', { count: detections.length })}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
                 {detections.length === 0 ? (
-                    <div className="text-gray-500 text-center py-8 text-sm italic">
+                    <div className="text-[var(--text-muted)] text-center py-8 text-sm italic">
                         {t('detectionDetail.noObjectsDetectedShort')}
                     </div>
                 ) : (

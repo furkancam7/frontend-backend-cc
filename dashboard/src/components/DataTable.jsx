@@ -49,20 +49,20 @@ const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, o
 
     if (isReceiving || (imgError && hasAnyActiveTransfer)) {
         return (
-             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-cyan-900/30 to-black border border-cyan-500/30">
+             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-cyan-900/20 to-[var(--bg-panel)] border border-cyan-500/30">
                 <div className="flex items-center gap-1 mb-1">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></span>
                     <span className="text-[10px] font-bold text-cyan-400 animate-pulse">{t('dataTable.receiving')}</span>
                 </div>
                 {activeTransfer && (
                     <>
-                        <div className="w-20 h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                        <div className="w-20 h-1.5 bg-[var(--bg-input)] rounded-full overflow-hidden">
                             <div 
-                                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300"
+                                className="h-full bg-gradient-to-r from-cyan-500 to-cyan-900 transition-all duration-300"
                                 style={{ width: `${activeTransfer.percent}%` }}
                             />
                         </div>
-                        <span className="text-[9px] text-gray-400 mt-1 font-mono">{activeTransfer.percent}%</span>
+                        <span className="text-[9px] text-[var(--text-muted)] mt-1 font-mono">{activeTransfer.percent}%</span>
                     </>
                 )}
             </div>
@@ -70,7 +70,7 @@ const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, o
     }
 
     return (
-        <div className="w-32 h-20 bg-black rounded overflow-hidden border border-gray-700 group relative">
+        <div className="w-32 h-20 bg-[var(--bg-input)] rounded overflow-hidden border border-[var(--border-color)] group relative">
             <img
                 src={imageUrl}
                 alt={t('dataTable.fullFrame')}
@@ -79,7 +79,7 @@ const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, o
                 onError={() => setImgError(true)}
                 loading="lazy"
             />
-             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
+             <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
                 <span className="text-xs text-white font-bold">{t('dataTable.locate')}</span>
             </div>
         </div>
@@ -102,14 +102,14 @@ const LocationCell = React.memo(({ location, row, onViewOnMap, t }) => {
 
     if (!hasLocation) {
         return (
-            <div className="w-32 h-20 bg-gray-900/50 rounded border border-gray-800 flex items-center justify-center text-gray-600 text-xs">
+            <div className="w-32 h-20 bg-[var(--bg-input)] rounded border border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] text-xs">
                 {t('dataTable.noSignal')}
             </div>
         );
     }
 
     return (
-        <div className="w-32 h-20 bg-black rounded overflow-hidden border border-gray-700 relative group">
+        <div className="w-32 h-20 bg-[var(--bg-input)] rounded overflow-hidden border border-[var(--border-color)] relative group">
             <img
                 src={mapUrl}
                 alt={t('dataTable.location')}
@@ -117,7 +117,7 @@ const LocationCell = React.memo(({ location, row, onViewOnMap, t }) => {
                 onClick={handleClick}
                 loading="lazy"
             />
-            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[9px] text-gray-300 px-1 py-0.5 font-mono truncate">
+            <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-[9px] text-white px-1 py-0.5 font-mono truncate">
                 {location.latitude.toFixed(4)}, {location.longitude.toFixed(4)}
             </div>
         </div>
@@ -135,7 +135,7 @@ const CropItem = React.memo(({ crop, isAdmin, editingCropId, setEditingCropId, o
     const handleSave = () => onUpdateCrop(crop.crop_id, editVal);
 
     return (
-        <div className="w-12 h-12 flex-shrink-0 bg-black rounded border border-gray-700 relative group cursor-help" title={`${localizedClass} (${crop.accuracy}%)`}>
+        <div className="w-12 h-12 flex-shrink-0 bg-[var(--bg-input)] rounded border border-[var(--border-color)] relative group cursor-help" title={`${localizedClass} (${crop.accuracy}%)`}>
             <img
                 src={`/api/image/crop/${crop.crop_id}`}
                 alt={localizedClass}
@@ -157,11 +157,11 @@ const CropItem = React.memo(({ crop, isAdmin, editingCropId, setEditingCropId, o
                         if (e.key === 'Escape') setEditingCropId(null);
                     }}
                     onClick={e => e.stopPropagation()}
-                    className="absolute inset-0 bg-black/90 text-white text-[8px] text-center w-full h-full outline-none border border-cyan-500"
+                    className="absolute inset-0 bg-[var(--bg-panel)]/95 text-[var(--text-main)] text-[8px] text-center w-full h-full outline-none border border-cyan-500"
                 />
             ) : (
                 <div
-                    className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[8px] text-white font-bold transition-opacity cursor-pointer"
+                    className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 flex items-center justify-center text-[8px] text-white font-bold transition-opacity cursor-pointer"
                     onClick={(e) => {
                         if (isAdmin) {
                             e.stopPropagation();
@@ -212,7 +212,7 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
 
     return (
         <div 
-            className="p-3 font-mono text-cyan-400 font-bold hover:text-white cursor-pointer transition-colors relative group"
+            className="p-3 font-mono text-cyan-500 font-bold hover:text-[var(--text-main)] cursor-pointer transition-colors relative group"
             onClick={handleClick}
         >
             {isAdmin && editingRecordId === row.record_id ? (
@@ -226,7 +226,7 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
                         if (e.key === 'Escape') setEditingRecordId(null);
                     }}
                     onClick={e => e.stopPropagation()}
-                    className="bg-black/90 text-white text-sm w-24 outline-none border border-cyan-500 px-1"
+                    className="bg-[var(--bg-input)] text-[var(--text-main)] text-sm w-24 outline-none border border-cyan-500 px-1"
                 />
             ) : (
                 <div className="flex items-center gap-1">
@@ -238,7 +238,7 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
                                 setEditingRecordId(row.record_id);
                                 setEditVal(row.device_id || '');
                             }}
-                            className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-cyan-500 transition-opacity"
+                            className="opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-cyan-500 transition-opacity"
                         >
                             ✎
                         </button>
@@ -326,17 +326,17 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
     }, [onRefresh, t]);
 
     return (
-        <div className="h-full flex flex-col bg-black text-gray-300 font-sans animate-in fade-in duration-300">
+        <div className="h-full flex flex-col bg-[var(--bg-panel)] text-[var(--text-main)] font-sans animate-in fade-in duration-300">
             {/* Header */}
-            <div className="p-4 border-b border-gray-900 bg-black flex justify-between items-center">
+            <div className="p-4 border-b border-[var(--border-color)] bg-[var(--bg-panel-header)] flex justify-between items-center">
                 <h2 className="flex items-center gap-3">
                     <div className="w-1 h-6 bg-cyan-500 rounded-full"></div>
-                    <span className="text-sm font-bold text-white uppercase tracking-wider">{t('dataTable.tableFormat')}</span>
-                    <span className="text-xs text-gray-600 font-mono bg-gray-950 px-2 py-1 rounded">({groupedData.length} {t('dataTable.records')})</span>
+                    <span className="text-sm font-bold text-[var(--text-main)] uppercase tracking-wider">{t('dataTable.tableFormat')}</span>
+                    <span className="text-xs text-[var(--text-muted)] font-mono bg-[var(--bg-input)] border border-[var(--border-color)] px-2 py-1 rounded">({groupedData.length} {t('dataTable.records')})</span>
                     {onRefresh && (
                         <button 
                             onClick={onRefresh}
-                            className="ml-2 px-3 py-1.5 text-xs bg-gray-950 hover:bg-gray-900 rounded-lg text-gray-500 hover:text-white border border-gray-900 hover:border-gray-800 transition-all"
+                            className="ml-2 px-3 py-1.5 text-xs bg-[var(--bg-input)] hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border-color)] transition-all"
                         >
                             ↻ {t('dataTable.refresh')}
                         </button>
@@ -348,7 +348,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
             <div className="flex-1 overflow-y-auto custom-scrollbar p-4" style={{ maxHeight: 'calc(100vh - 100px)' }}>
                 <table className="w-full border-collapse text-sm">
                     <thead>
-                        <tr className="bg-gray-950 text-gray-500 border-b border-gray-900">
+                        <tr className="bg-[var(--bg-input)] text-[var(--text-muted)] border-b border-[var(--border-color)]">
                             <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.fullFrame')}</th>
                             <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.location')}</th>
                             <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.detectedObjects')}</th>
@@ -362,7 +362,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                             const activeTransfer = activeTransfersByRecordId.get(row.record_id);
                             
                             return (
-                                <tr key={row.record_id} className="border-b border-gray-900 hover:bg-gray-950 transition-colors">
+                                <tr key={row.record_id} className="border-b border-[var(--border-color)] hover:bg-[var(--bg-hover)] transition-colors">
                                     {}
                                     <td className="p-3">
                                         <FullImageCell 
@@ -410,7 +410,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                     </td>
 
                                     {}
-                                    <td className="p-3 font-mono text-gray-400">
+                                    <td className="p-3 font-mono text-[var(--text-muted)]">
                                         {row.captured_time ? new Date(row.captured_time).toLocaleString(locale) : t('dataTable.notAvailable')}
                                     </td>
 
@@ -419,7 +419,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                         <div className="flex items-center justify-center gap-2">
                                             <button
                                                 onClick={() => onOpenDetail && onOpenDetail(row.record_id)}
-                                                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-gray-400 hover:bg-cyan-900 hover:text-cyan-400"
+                                                className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-[var(--bg-input)] text-[var(--text-muted)] hover:bg-cyan-900/20 hover:text-cyan-500 border border-[var(--border-color)]"
                                                 title={t('dataTable.viewDetails')}
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -430,7 +430,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                             {isAdmin && (
                                                 <button
                                                     onClick={(e) => handleDeleteRecord(row, e)}
-                                                    className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-red-500 hover:bg-red-900/50 hover:text-red-400"
+                                                    className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-[var(--bg-input)] text-red-500 hover:bg-red-900/20 hover:text-red-400 border border-[var(--border-color)]"
                                                     title={t('dataTable.deleteRecord')}
                                                 >
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

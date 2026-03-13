@@ -111,7 +111,7 @@ function TabButton({ active, label, onClick }) {
       onClick={onClick}
       className={`rounded-full border px-3.5 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-all ${
         active
-          ? 'border-cyan-400/60 bg-cyan-400/14 text-cyan-100 shadow-[0_0_0_1px_rgba(34,211,238,0.14)]'
+          ? 'border-cyan-400/60 bg-cyan-400/14 text-cyan-100 shadow-[0_0_0_1px_rgba(252,88,28,0.14)]'
           : 'border-gray-800 bg-gray-950/80 text-gray-400 hover:border-gray-700 hover:text-gray-200'
       }`}
     >

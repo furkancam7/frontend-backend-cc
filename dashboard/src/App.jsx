@@ -567,18 +567,28 @@ function getLocalizedMapStyleName(style, t) {
 function MapControls({ isMapToolsOpen, isStyleMenuOpen, mapStyle, MAP_STYLES, toggleMapTools, toggleStyleMenu, handleMapStyleChange, flyToHome, flyToResponsibleArea, isSettingsOpen, onToggleSettings, isAdmin, t }) {
   return (
     <>
-      <div className="absolute top-4 z-[15] transition-all duration-300 left-14 sm:left-16">
-        <button onClick={toggleMapTools} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center transition-all ${isMapToolsOpen ? 'border-cyan-500 text-cyan-400' : 'border-gray-700 text-gray-400 hover:text-white'}`} title={t('app.mapTools')}>
-          <Icon path={isMapToolsOpen ? "M6 18L18 6M6 6l12 12" : "M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"} />
-        </button>
+      <div className="absolute bottom-28 sm:bottom-32 right-4 z-[15] transition-all duration-300 flex flex-col items-end">
         {isMapToolsOpen && (
-          <div className="mt-2 flex flex-col gap-1.5 sm:gap-2 animate-fadeIn">
+          <div className="mb-2 flex flex-col-reverse gap-1.5 sm:gap-2 animate-fadeIn items-end">
+            {isAdmin && (
+              <button onClick={flyToResponsibleArea} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border border-gray-700 rounded flex items-center justify-center text-gray-400 hover:text-amber-400 hover:border-amber-500 transition-all" title={t('app.responsibleArea')}>
+                <Icon path="M4 6h16M4 12h16M4 18h16" />
+              </button>
+            )}
+            <button onClick={flyToHome} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border border-gray-700 rounded flex items-center justify-center text-gray-400 hover:text-cyan-400 hover:border-cyan-500 transition-all" title={t('app.homeLocation')}>
+              <Icon path="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </button>
+            {isAdmin && (
+              <button onClick={onToggleSettings} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center transition-all ${isSettingsOpen ? 'border-cyan-500 text-cyan-400 shadow-[0_0_8px_rgba(252,88,28,0.4)]' : 'border-gray-700 text-gray-400 hover:text-white'}`} title={t('app.locationSettings')}>
+                <Icon path="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              </button>
+            )}
             <div className="relative">
               <button onClick={toggleStyleMenu} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border border-gray-700 rounded flex items-center justify-center ${isStyleMenuOpen ? 'text-white border-gray-500 bg-gray-800' : 'text-gray-400 hover:text-white'}`} title={t('app.mapStyle')}>
                 <Icon path="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l5.447 2.724A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
               </button>
               {isStyleMenuOpen && (
-                <div className="absolute left-12 top-0 w-48 bg-[#111]/95 backdrop-blur border border-gray-700 rounded shadow-xl overflow-hidden z-50">
+                <div className="absolute right-12 bottom-0 w-48 bg-[#111]/95 backdrop-blur border border-gray-700 rounded shadow-xl overflow-hidden z-50">
                   <div className="p-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-800">{t('app.mapLayers')}</div>
                   {MAP_STYLES.map((style) => (
                     <button key={style.id} onClick={() => handleMapStyleChange(style.url)} className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between hover:bg-gray-800 ${mapStyle === style.url ? 'text-fuchsia-500 font-medium' : 'text-gray-300'}`}>
@@ -589,21 +599,11 @@ function MapControls({ isMapToolsOpen, isStyleMenuOpen, mapStyle, MAP_STYLES, to
                 </div>
               )}
             </div>
-            {isAdmin && (
-              <button onClick={onToggleSettings} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center transition-all ${isSettingsOpen ? 'border-cyan-500 text-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.4)]' : 'border-gray-700 text-gray-400 hover:text-white'}`} title={t('app.locationSettings')}>
-                <Icon path="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              </button>
-            )}
-            <button onClick={flyToHome} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border border-gray-700 rounded flex items-center justify-center text-gray-400 hover:text-cyan-400 hover:border-cyan-500 transition-all" title={t('app.homeLocation')}>
-              <Icon path="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-            </button>
-            {isAdmin && (
-              <button onClick={flyToResponsibleArea} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border border-gray-700 rounded flex items-center justify-center text-gray-400 hover:text-amber-400 hover:border-amber-500 transition-all" title={t('app.responsibleArea')}>
-                <Icon path="M4 6h16M4 12h16M4 18h16" />
-              </button>
-            )}
           </div>
         )}
+        <button onClick={toggleMapTools} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center transition-all ${isMapToolsOpen ? 'border-cyan-500 text-cyan-400' : 'border-gray-700 text-gray-400 hover:text-white'}`} title={t('app.mapTools')}>
+          <Icon path={isMapToolsOpen ? "M6 18L18 6M6 6l12 12" : "M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"} />
+        </button>
       </div>
     </>
   );

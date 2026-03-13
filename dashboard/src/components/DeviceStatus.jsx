@@ -37,7 +37,7 @@ const DeviceMiniMap = memo(({ latitude, longitude, t }) => {
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
             {/* Center marker glow */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.8)]" />
+                <div className="w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(252,88,28,0.8)]" />
             </div>
         </div>
     );

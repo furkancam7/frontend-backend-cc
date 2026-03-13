@@ -15,11 +15,11 @@
     --bg-input: #050505;
     --bg-hover: #18181b;
     --border-color: #27272a;
-    --accent: #06b6d4;
+    --accent: #FC581C;
     --text-main: #e4e4e7;
     --text-muted: #71717a;
-    --selection-bg: rgba(34, 211, 238, 0.3);
-    --selection-text: #cffafe;
+    --selection-bg: rgba(252, 88, 28, 0.25);
+    --selection-text: #FFE2D2;
   }
 
   :root[data-theme='light'] {
@@ -32,10 +32,10 @@
     --bg-input: #ffffff;
     --bg-hover: #e2e8f0;
     --border-color: #cbd5e1;
-    --accent: #0f766e;
+    --accent: #10302C;
     --text-main: #0f172a;
     --text-muted: #475569;
-    --selection-bg: rgba(15, 118, 110, 0.22);
+    --selection-bg: rgba(16, 48, 44, 0.18);
     --selection-text: #0f172a;
   }
 
@@ -142,6 +142,11 @@
   border: 1px solid #27272a !important;
 }
 
+.mapboxgl-ctrl-bottom-right {
+  right: 8px !important;
+  bottom: 8px !important;
+}
+
 .mapboxgl-ctrl-top-left {
   top: 180px !important;
   left: 8px !important;
@@ -151,6 +156,11 @@
   .mapboxgl-ctrl-top-left {
     top: 200px !important;
     left: 16px !important;
+  }
+
+  .mapboxgl-ctrl-bottom-right {
+    right: 16px !important;
+    bottom: 16px !important;
   }
 }
 
@@ -240,11 +250,11 @@
 }
 
 .progress-bar-fill {
-  @apply h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300;
+  @apply h-full bg-gradient-to-r from-cyan-500 to-cyan-900 transition-all duration-300;
 }
 
 .progress-bar-fill-transfer {
-  @apply h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300;
+  @apply h-full bg-gradient-to-r from-cyan-500 to-cyan-900 transition-all duration-300;
 }
 
 .category-border {

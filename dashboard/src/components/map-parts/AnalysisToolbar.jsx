@@ -21,7 +21,7 @@ const AnalysisToolbar = memo(({
           iconType="history"
           active={showHistory}
           onClick={onToggleHistory}
-          activeColor="border-cyan-500 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]"
+          activeColor="border-cyan-500 text-cyan-400 shadow-[0_0_8px_rgba(252,88,28,0.4)]"
         />
       </div>
     </div>

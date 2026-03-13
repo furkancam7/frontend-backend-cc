@@ -40,7 +40,7 @@ const Login = ({ setToken, setUserRole, setCurrentUser }) => {
 
       { }
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(6,182,212,0.05),transparent_50%)]"></div>
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(252,88,28,0.05),transparent_50%)]"></div>
         <div className="absolute bottom-0 right-0 w-full h-full bg-[radial-gradient(circle_at_100%_100%,rgba(168,85,247,0.05),transparent_50%)]"></div>
         <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20viewBox%3D%220%200%20256%20256%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cfilter%20id%3D%22n%22%3E%3CfeTurbulence%20type%3D%22fractalNoise%22%20baseFrequency%3D%220.7%22%20numOctaves%3D%224%22%20stitchTiles%3D%22stitch%22%2F%3E%3C%2Ffilter%3E%3Crect%20width%3D%22100%25%22%20height%3D%22100%25%22%20filter%3D%22url(%23n)%22%20opacity%3D%221%22%2F%3E%3C%2Fsvg%3E')] opacity-[0.03]"></div>
       </div>
@@ -54,11 +54,11 @@ const Login = ({ setToken, setUserRole, setCurrentUser }) => {
           { }
           <div className="flex flex-col items-center mb-10 space-y-4">
             <div className="w-64 h-28 md:w-72 md:h-32 bg-gradient-to-br from-[#061318] via-black to-[#0a0a0a] rounded-3xl flex items-center justify-center border border-cyan-950/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_18px_40px_rgba(0,0,0,0.45)] mb-4 group relative overflow-hidden px-6">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(34,211,238,0.14),transparent_55%)] opacity-80" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(252,88,28,0.14),transparent_55%)] opacity-80" />
               <img
                 src="/assets/stopfires.png?v=2"
                 alt="StopFires"
-                className="relative w-52 md:w-60 h-auto object-contain opacity-95 drop-shadow-[0_0_18px_rgba(34,211,238,0.16)] group-hover:scale-[1.03] transition-all duration-500"
+                className="relative w-52 md:w-60 h-auto object-contain opacity-95 drop-shadow-[0_0_18px_rgba(252,88,28,0.16)] group-hover:scale-[1.03] transition-all duration-500"
               />
             </div>
             <div className="text-center">

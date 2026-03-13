@@ -13,7 +13,7 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ'
 
-const DEFAULT_MAP_CENTER = [20.49456016, 44.55221753];
+const DEFAULT_MAP_CENTER = [19.667679,46.155854];
 const DEFAULT_MAP_ZOOM = 16;
 const DEFAULT_MAP_PITCH = 60;
 const DEFAULT_MAP_BEARING = -17.6;
@@ -154,8 +154,11 @@ const addCropLayers = (map) => {
                 paint: {
                     'circle-radius': ['case', ['boolean', ['get', 'selected'], false], 10, 7],
                     'circle-color': ['get', 'color'],
+                    // Keep hit area/interactions, but hide detection circles visually.
+                    'circle-opacity': 0,
                     'circle-stroke-width': ['case', ['boolean', ['get', 'selected'], false], 2, 1.5],
-                    'circle-stroke-color': ['case', ['boolean', ['get', 'selected'], false], '#ffffff', ['get', 'borderColor']]
+                    'circle-stroke-color': ['case', ['boolean', ['get', 'selected'], false], '#ffffff', ['get', 'borderColor']],
+                    'circle-stroke-opacity': 0
                 }
             });
         }
@@ -200,7 +203,7 @@ const addRadarLayers = (map) => {
                 type: 'fill',
                 source: deviceSource,
                 paint: {
-                    'fill-color': '#06b6d4',
+                    'fill-color': '#10302C',
                     'fill-opacity': 0.18
                 }
             };
@@ -216,7 +219,7 @@ const addRadarLayers = (map) => {
                 type: 'line',
                 source: deviceSource,
                 paint: {
-                    'line-color': '#22d3ee',
+                    'line-color': '#FC581C',
                     'line-width': 3,
                     'line-opacity': 0.95,
                     'line-dasharray': [2, 2]
@@ -749,7 +752,7 @@ const MapView = ({
             el.dataset.deviceId = device.id;
 
             const icon = document.createElement('div');
-            icon.className = "w-6 h-6 rounded-full border-2 border-cyan-500 bg-black/80 flex items-center justify-center shadow-[0_0_10px_rgba(6,182,212,0.4)]";
+            icon.className = "w-6 h-6 rounded-full border-2 border-cyan-500 bg-black/80 flex items-center justify-center shadow-[0_0_10px_rgba(252,88,28,0.4)]";
             const dot = document.createElement('div');
             dot.className = "w-2 h-2 bg-cyan-400 rounded-full animate-pulse";
             icon.appendChild(dot);
@@ -927,7 +930,7 @@ const MapView = ({
                 projection: 'globe'
             });
 
-            map.current.addControl(new mapboxgl.NavigationControl(), 'top-left');
+            map.current.addControl(new mapboxgl.NavigationControl(), 'bottom-right');
             map.current.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-left');
             handleStyleReady = () => {
                 if (styleReadyHandled) return;

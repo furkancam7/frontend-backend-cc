@@ -27,7 +27,7 @@ const LoadingSpinner = ({ title, subtitle, type = 'cyan' }) => {
     const borderClass = type === 'yellow' ? 'border-yellow-500/30' : 'border-cyan-500/30';
 
     return (
-        <div className={`flex flex-col items-center gap-4 p-8 bg-black/80 rounded-xl border ${borderClass}`}>
+        <div className={`flex flex-col items-center gap-4 p-8 bg-[var(--bg-panel)] rounded-xl border ${borderClass}`}>
             <div className="flex items-center gap-3">
                 <div className="relative">
                     <div className={`w-4 h-4 rounded-full animate-ping absolute ${bgClass}`} />
@@ -37,28 +37,28 @@ const LoadingSpinner = ({ title, subtitle, type = 'cyan' }) => {
                     {title}
                 </span>
             </div>
-            {subtitle && <p className="text-sm text-gray-400 text-center">{subtitle}</p>}
+            {subtitle && <p className="text-sm text-[var(--text-muted)] text-center">{subtitle}</p>}
         </div>
     );
 };
 
 const TransferProgress = ({ filename, percent, chunksReceived, chunksTotal, isReceiving }) => (
     <div className="w-64">
-        <div className="flex justify-between text-xs text-gray-400 mb-2">
+        <div className="flex justify-between text-xs text-[var(--text-muted)] mb-2">
             <span className="truncate max-w-[180px]">{filename}</span>
             <span className="font-mono text-cyan-400">{percent}%</span>
         </div>
-        <div className="h-3 bg-gray-800 rounded-full overflow-hidden">
+        <div className="h-3 bg-[var(--bg-input)] rounded-full overflow-hidden">
             <div
                 className={`h-full transition-all duration-300 ${isReceiving
                         ? 'bg-gradient-to-r from-cyan-600 via-cyan-400 to-cyan-600 bg-[length:200%_100%] animate-[shimmer_2s_infinite]'
-                        : 'bg-gradient-to-r from-cyan-500 to-blue-500'
+                        : 'bg-gradient-to-r from-cyan-500 to-cyan-900'
                     }`}
                 style={{ width: `${percent}%` }}
             />
         </div>
         {chunksTotal && (
-            <div className="text-center text-xs text-gray-500 mt-2 font-mono">
+            <div className="text-center text-xs text-[var(--text-muted)] mt-2 font-mono">
                 {chunksReceived} / {chunksTotal} chunks
             </div>
         )}
@@ -102,16 +102,16 @@ export default function ImageCanvas({
             const scaledLineWidth = 2 / scale;
             const fontSize = 14 / scale;
             const padding = 4 / scale;
-            ctx.strokeStyle = '#06b6d4';
+            ctx.strokeStyle = '#FC581C';
             ctx.lineWidth = scaledLineWidth;
             ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
-            ctx.fillStyle = 'rgba(6, 182, 212, 0.2)';
+            ctx.fillStyle = 'rgba(16,48,44,0.2)';
             ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
             ctx.font = `bold ${fontSize}px sans-serif`;
             const text = `${selectedCrop.class} (${selectedCrop.accuracy}%)`;
             const textMetrics = ctx.measureText(text);
             const textHeight = fontSize;
-            ctx.fillStyle = '#0891b2';
+            ctx.fillStyle = '#10302C';
             ctx.fillRect(x1, y1 - textHeight - padding * 2, textMetrics.width + padding * 2, textHeight + padding * 2);
             ctx.fillStyle = 'white';
             ctx.fillText(text, x1 + padding, y1 - padding);
@@ -348,7 +348,7 @@ export default function ImageCanvas({
         if (detectionTransferStatus?.status === 'receiving' && detectionTransferStatus?.transfer) {
             const { transfer } = detectionTransferStatus;
             return (
-                <div className="flex flex-col items-center gap-4 p-8 bg-black/80 rounded-xl border border-cyan-500/30">
+                <div className="flex flex-col items-center gap-4 p-8 bg-[var(--bg-panel)] rounded-xl border border-cyan-500/30">
                     <LoadingSpinner title="RECEIVING" type="cyan" />
                     <TransferProgress
                         filename={transfer.filename}
@@ -367,7 +367,7 @@ export default function ImageCanvas({
             return (
                 <LoadingSpinner
                     title="PARTIAL IMAGE"
-                    subtitle={<span>Image transfer incomplete<br /><span className="text-xs text-gray-500">Waiting for remaining data...</span></span>}
+                    subtitle={<span>Image transfer incomplete<br /><span className="text-xs text-[var(--text-muted)]">Waiting for remaining data...</span></span>}
                     type="yellow"
                 />
             );
@@ -375,7 +375,7 @@ export default function ImageCanvas({
 
         if (activeTransfers.length > 0) {
             return (
-                <div className="flex flex-col items-center gap-4 p-8 bg-black/80 rounded-xl border border-cyan-500/30">
+                <div className="flex flex-col items-center gap-4 p-8 bg-[var(--bg-panel)] rounded-xl border border-cyan-500/30">
                     <LoadingSpinner title="TRANSFER IN PROGRESS" type="cyan" />
                     <div className="space-y-4">
                         {activeTransfers.map(t => (
@@ -391,13 +391,13 @@ export default function ImageCanvas({
             );
         }
 
-        return <div className="text-gray-500 animate-pulse">Loading Image...</div>;
+        return <div className="text-[var(--text-muted)] animate-pulse">Loading Image...</div>;
     };
 
     return (
         <div
             ref={containerRef}
-            className="flex-1 bg-black relative flex items-center justify-center overflow-hidden border-r border-gray-800 cursor-move h-full w-full"
+            className="flex-1 bg-[var(--bg-deep)] relative flex items-center justify-center overflow-hidden border-r border-[var(--border-color)] cursor-move h-full w-full"
         >
             <canvas
                 ref={canvasRef}
@@ -416,7 +416,7 @@ export default function ImageCanvas({
                             setUiScale(transformRef.current.scale);
                             requestAnimationFrame(draw);
                         }}
-                        className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-gray-900/90 border border-gray-700 text-white rounded hover:bg-gray-800 hover:border-cyan-500 transition-colors font-bold text-sm sm:text-base"
+                        className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-main)] rounded hover:bg-[var(--bg-hover)] hover:border-cyan-500 transition-colors font-bold text-sm sm:text-base"
                     >
                         +
                     </button>
@@ -427,17 +427,17 @@ export default function ImageCanvas({
                             setUiScale(transformRef.current.scale);
                             requestAnimationFrame(draw);
                         }}
-                        className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-gray-900/90 border border-gray-700 text-white rounded hover:bg-gray-800 hover:border-cyan-500 transition-colors font-bold text-sm sm:text-base"
+                        className="w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-main)] rounded hover:bg-[var(--bg-hover)] hover:border-cyan-500 transition-colors font-bold text-sm sm:text-base"
                     >
                         -
                     </button>
                     <button
                         onClick={resetZoom}
-                        className="px-2 sm:px-3 h-7 sm:h-8 flex items-center justify-center bg-gray-900/90 border border-gray-700 text-white rounded hover:bg-gray-800 hover:border-cyan-500 transition-colors text-[10px] sm:text-xs font-bold tracking-wider"
+                        className="px-2 sm:px-3 h-7 sm:h-8 flex items-center justify-center bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-main)] rounded hover:bg-[var(--bg-hover)] hover:border-cyan-500 transition-colors text-[10px] sm:text-xs font-bold tracking-wider"
                     >
                         RESET
                     </button>
-                    <div className="px-2 sm:px-3 h-7 sm:h-8 flex items-center justify-center bg-black/50 border border-gray-800 text-cyan-500 rounded text-[10px] sm:text-xs font-mono min-w-[50px] sm:min-w-[60px]">
+                    <div className="px-2 sm:px-3 h-7 sm:h-8 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-color)] text-cyan-500 rounded text-[10px] sm:text-xs font-mono min-w-[50px] sm:min-w-[60px]">
                         {Math.round(uiScale * 100)}%
                     </div>
                 </div>

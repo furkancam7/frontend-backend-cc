@@ -34,8 +34,9 @@ const drawBoundingBox = (ctx, detection, scaleX, scaleY) => {
   const scaledY = y1 * scaleY
   const scaledWidth = (x2 - x1) * scaleX
   const scaledHeight = (y2 - y1) * scaleY
-  const color = '#00E0FF'
-  ctx.strokeStyle = color
+  const strokeColor = '#FC581C'
+  const fillColor = '#10302C'
+  ctx.strokeStyle = strokeColor
   ctx.lineWidth = 3
   ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight)
   const accuracy = normalizeAccuracy(detection)
@@ -44,12 +45,12 @@ const drawBoundingBox = (ctx, detection, scaleX, scaleY) => {
   const textMetrics = ctx.measureText(label)
   const textHeight = 20
   const padding = 4
-  ctx.fillStyle = color
+  ctx.fillStyle = fillColor
   ctx.fillRect(scaledX, scaledY - textHeight - padding, textMetrics.width + padding * 2, textHeight + padding)
   ctx.fillStyle = '#000000'
   ctx.font = 'bold 14px Inter, sans-serif'
   ctx.fillText(label, scaledX + padding, scaledY - padding - 4)
-  drawCornerMarkers(ctx, scaledX, scaledY, scaledWidth, scaledHeight, color)
+  drawCornerMarkers(ctx, scaledX, scaledY, scaledWidth, scaledHeight, strokeColor)
 }
 
 const calculateCanvasDimensions = (img, containerWidth, containerHeight) => {
