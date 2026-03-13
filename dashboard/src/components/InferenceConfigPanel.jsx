@@ -9,6 +9,19 @@ import {
   toInferenceFormState,
 } from '../constants/inferenceConfig';
 
+const DEFAULT_SECTION_STATE = {
+  runtime: true,
+  model: true,
+  camera: false,
+  detection: false,
+};
+
+const DETECTION_SUBGROUPS = [
+  { id: 'thresholds', label: 'Thresholds' },
+  { id: 'motion_drift', label: 'Motion / Drift' },
+  { id: 'video', label: 'Video' },
+];
+
 function formatTs(value) {
   if (!value) return '—';
   try {
@@ -40,110 +53,193 @@ function makeRequestId(deviceId) {
   return `req-${deviceId}-${stamp}-${suffix}`;
 }
 
-function AckStatusCard({ summary }) {
-  const current = summary?.current || {};
-  const pendingRequest = summary?.pending_request;
-  const displayStatus = pendingRequest ? 'pending' : (current.status || 'none');
-  const statusClass = INFERENCE_STATUS_CLASS[displayStatus] || INFERENCE_STATUS_CLASS.none;
-  const changedKeys = pendingRequest?.changed_keys_json || [];
-  const errors = current.errors || [];
-  const container = current.container || {};
+function formatValue(value, meta) {
+  if (value === undefined || value === null || value === '') return '—';
+  if (meta?.type === 'boolean') return value === true ? 'Enabled' : 'Disabled';
+  if (meta?.type === 'array') {
+    try {
+      return JSON.stringify(Array.isArray(value) ? value : JSON.parse(value), null, 0);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function SummaryCard({ title, toneClass = '', children, meta }) {
+  return (
+    <div className={`rounded-2xl border border-gray-900 bg-gradient-to-b from-gray-950 to-[#050816] p-4 ${toneClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{title}</div>
+          <div className="mt-2">{children}</div>
+        </div>
+        {meta && <div className="text-right text-[11px] font-mono text-gray-300">{meta}</div>}
+      </div>
+    </div>
+  );
+}
+
+function LabeledValue({ label, value, mono = false }) {
+  return (
+    <div className="rounded-xl border border-gray-800 bg-black/30 px-3 py-2.5">
+      <div className="text-[10px] uppercase tracking-[0.2em] text-gray-500">{label}</div>
+      <div className={`mt-1 text-sm text-gray-200 ${mono ? 'font-mono' : 'font-medium'} break-all`}>
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function CollapsibleSection({ label, description, changedCount, isOpen, onToggle, children }) {
+  return (
+    <section className="rounded-2xl border border-gray-900 bg-gradient-to-b from-gray-950 to-[#050816]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 px-4 py-4 text-left"
+      >
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-[0.24em] text-gray-500">Edit Section</div>
+          <div className="mt-1 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-white">{label}</h3>
+            {changedCount > 0 && (
+              <span className="rounded-full border border-cyan-500/30 bg-cyan-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-100">
+                {changedCount} changed
+              </span>
+            )}
+          </div>
+          {description && <p className="mt-1 text-[12px] text-gray-500">{description}</p>}
+        </div>
+        <span className="rounded-full border border-gray-800 bg-black/30 p-2 text-gray-400">
+          <svg className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m5 8 5 5 5-5" />
+          </svg>
+        </span>
+      </button>
+      {isOpen && <div className="border-t border-gray-900 px-4 py-4">{children}</div>}
+    </section>
+  );
+}
+
+function SectionSubgroup({ label, children }) {
+  return (
+    <div className="space-y-3 rounded-2xl border border-gray-900/80 bg-black/20 p-3">
+      <div className="text-[10px] uppercase tracking-[0.22em] text-cyan-200/80">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function DirtyReview({ rows }) {
+  if (rows.length === 0) return null;
 
   return (
-    <div className={`rounded-lg border p-3 space-y-2 ${statusClass}`}>
+    <div className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4">
+      <div className="text-[10px] uppercase tracking-[0.24em] text-cyan-200/80">Review Changes</div>
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {rows.map(row => (
+          <div key={row.field} className="rounded-xl border border-cyan-500/15 bg-black/25 px-3 py-3">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-gray-400">{row.label}</div>
+            <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-start gap-2 text-sm">
+              <div className="min-w-0 rounded-lg border border-gray-800 bg-gray-950 px-2 py-2 text-gray-400 break-all">
+                {row.before}
+              </div>
+              <div className="pt-2 text-cyan-200">-&gt;</div>
+              <div className="min-w-0 rounded-lg border border-cyan-500/20 bg-cyan-500/8 px-2 py-2 text-cyan-50 break-all">
+                {row.after}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AdvancedDisclosure({ title, isOpen, onToggle, children }) {
+  return (
+    <div className="rounded-2xl border border-gray-900 bg-gradient-to-b from-gray-950 to-[#050816]">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left"
+      >
+        <div className="text-[10px] uppercase tracking-[0.24em] text-gray-500">{title}</div>
+        <span className="rounded-full border border-gray-800 bg-black/30 p-2 text-gray-400">
+          <svg className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m5 8 5 5 5-5" />
+          </svg>
+        </span>
+      </button>
+      {isOpen && <div className="border-t border-gray-900 px-4 py-4">{children}</div>}
+    </div>
+  );
+}
+
+function renderFieldInput({
+  field,
+  meta,
+  value,
+  isChanged,
+  fieldError,
+  isReachable,
+  handleFieldChange,
+}) {
+  const inputClass = `w-full rounded-xl border bg-black px-3 py-2.5 text-sm text-gray-100 ${
+    isChanged ? 'border-cyan-500/40' : 'border-gray-800'
+  }`;
+
+  return (
+    <label key={field} className="block space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-gray-500">Config Status</div>
-          <div className="text-sm font-bold">{formatStatusLabel(displayStatus)}</div>
-        </div>
-        <div className="text-right text-[11px] font-mono">
-          <div>version: {pendingRequest?.config_version ?? current.config_version ?? '—'}</div>
-          <div>request: {pendingRequest?.request_id ?? current.request_id ?? '—'}</div>
-        </div>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-gray-400">{meta.label}</span>
+        {isChanged && (
+          <span className="rounded-full border border-cyan-500/25 bg-cyan-500/12 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-cyan-100">
+            Changed
+          </span>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-2 text-[11px] text-gray-200">
-        <div className="rounded border border-gray-800 bg-black/30 px-2 py-1.5">
-          applied_at: {formatTs(current.applied_at)}
-        </div>
-        <div className="rounded border border-gray-800 bg-black/30 px-2 py-1.5">
-          source: {current.source || 'none'}
-        </div>
-      </div>
-      <div className="text-[11px] text-gray-300">
-        container: {container.name || '—'} / {container.state || '—'}
-      </div>
-      {changedKeys.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {changedKeys.map(key => (
-            <span key={key} className="px-1.5 py-0.5 rounded border border-cyan-500/30 bg-cyan-500/10 text-[10px] text-cyan-200">
-              {key}
-            </span>
-          ))}
-        </div>
+      {meta.type === 'boolean' ? (
+        <label className="inline-flex min-h-[44px] items-center gap-3 rounded-xl border border-gray-800 bg-black/30 px-3 py-2 text-sm text-gray-200">
+          <input
+            type="checkbox"
+            checked={value === true}
+            disabled={!isReachable}
+            onChange={(e) => handleFieldChange(field, e.target.checked)}
+          />
+          {value === true ? 'Enabled' : value === false ? 'Disabled' : 'Not Set'}
+        </label>
+      ) : meta.type === 'array' ? (
+        <textarea
+          className={`${inputClass} min-h-[108px] font-mono`}
+          value={value}
+          disabled={!isReachable}
+          onChange={(e) => handleFieldChange(field, e.target.value)}
+        />
+      ) : (
+        <input
+          className={inputClass}
+          type={meta.type === 'text' ? 'text' : 'number'}
+          value={value}
+          min={meta.min}
+          max={meta.max}
+          step={meta.step}
+          disabled={!isReachable}
+          onChange={(e) => handleFieldChange(field, e.target.value)}
+        />
       )}
-      {errors.length > 0 && (
-        <div className="rounded border border-red-500/30 bg-red-500/10 px-2 py-2 text-[11px] text-red-200 whitespace-pre-wrap break-words">
-          {errors.map(err => (typeof err === 'string' ? err : JSON.stringify(err))).join('\n')}
-        </div>
+      {meta.helperText && (
+        <div className="text-[11px] leading-5 text-gray-500">{meta.helperText}</div>
       )}
-    </div>
+      {fieldError && (
+        <div className="text-[11px] text-red-300">{fieldError}</div>
+      )}
+    </label>
   );
 }
 
-function TransportDiagnosticsCard({ transport }) {
-  const publishEvent = transport?.last_publish_event;
-  const publishPayload = publishEvent?.payload_json || {};
-  const ackEvent = transport?.last_ack_event;
-  const publishConfirmed = publishEvent?.event_type === 'inference_config_publish_confirmed';
-  const publishFailed = publishEvent?.event_type === 'inference_config_publish_failed';
-
-  return (
-    <div className="rounded-lg border border-gray-900 bg-gray-950 p-3 space-y-2">
-      <div className="text-[10px] uppercase tracking-wider text-gray-500">Transport Diagnostics</div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-gray-200">
-        <div className="rounded border border-gray-800 bg-black/30 px-2 py-1.5">
-          broker: {transport?.broker_host || '—'}:{transport?.broker_port ?? '—'}
-        </div>
-        <div className="rounded border border-gray-800 bg-black/30 px-2 py-1.5">
-          publish: {publishFailed ? 'failed' : publishConfirmed ? 'confirmed' : 'not observed'}
-        </div>
-        <div className="rounded border border-gray-800 bg-black/30 px-2 py-1.5">
-          qos/retain: {transport?.qos ?? '—'} / {String(transport?.retain ?? false)}
-        </div>
-        <div className="rounded border border-gray-800 bg-black/30 px-2 py-1.5">
-          pending age: {formatDurationSeconds(transport?.pending_age_s)}
-        </div>
-      </div>
-      <div className="space-y-1 text-[11px] text-gray-300">
-        <div>
-          device: <span className="font-mono break-all">{publishPayload?.device_id || '—'}</span>
-        </div>
-        <div>
-          request: <span className="font-mono break-all">{publishPayload?.request_id || '—'}</span>
-        </div>
-        <div>
-          desired: <span className="font-mono break-all">{transport?.desired_topic || '—'}</span>
-        </div>
-        <div>
-          applied: <span className="font-mono break-all">{transport?.applied_topic || '—'}</span>
-        </div>
-        <div>
-          last publish: {formatTs(publishEvent?.event_at)}{publishPayload?.mid != null ? ` | mid: ${publishPayload.mid}` : ''}
-        </div>
-        <div>
-          ack observed: {ackEvent?.ack_received_at ? formatTs(ackEvent.ack_received_at) : 'no'}
-        </div>
-      </div>
-      {publishPayload?.error && (
-        <div className="rounded border border-red-500/30 bg-red-500/10 px-2 py-2 text-[11px] text-red-200 whitespace-pre-wrap break-words">
-          {publishPayload.error}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function InferenceHistoryList({ history = [], maxHeightClass = 'max-h-64' }) {
+export function InferenceHistoryList({ history = [] }) {
   return (
     <div className="space-y-2">
       {history.map(row => (
@@ -151,25 +247,16 @@ export function InferenceHistoryList({ history = [], maxHeightClass = 'max-h-64'
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Request</div>
-              <div className={`mt-1 break-all font-mono ${maxHeightClass ? '' : ''}`}>{row.request_id}</div>
+              <div className="mt-1 break-all font-mono">{row.request_id}</div>
             </div>
             <span className="rounded-full border border-gray-700 bg-gray-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-200">
               {formatStatusLabel(row.ack_status || row.request_state)}
             </span>
           </div>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-2">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Version</div>
-              <div className="mt-1 text-sm font-semibold text-white font-mono">{row.config_version ?? '—'}</div>
-            </div>
-            <div className="rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-2">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Created</div>
-              <div className="mt-1 text-xs text-gray-200 font-mono">{formatTs(row.created_at)}</div>
-            </div>
-            <div className="rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-2">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Applied</div>
-              <div className="mt-1 text-xs text-gray-200 font-mono">{formatTs(row.applied_at)}</div>
-            </div>
+            <LabeledValue label="Version" value={row.config_version ?? '—'} mono />
+            <LabeledValue label="Created" value={formatTs(row.created_at)} mono />
+            <LabeledValue label="Applied" value={formatTs(row.applied_at)} mono />
           </div>
         </div>
       ))}
@@ -198,6 +285,9 @@ export default function InferenceConfigPanel({
   const [summary, setSummary] = useState(null);
   const [formState, setFormState] = useState(() => toInferenceFormState());
   const [fieldErrors, setFieldErrors] = useState({});
+  const [expandedSections, setExpandedSections] = useState(DEFAULT_SECTION_STATE);
+  const [showAdvancedDiagnostics, setShowAdvancedDiagnostics] = useState(false);
+  const [showRawJson, setShowRawJson] = useState(false);
   const lastDeviceRef = useRef(null);
 
   const loadConfig = useCallback(async ({ silent = false, resetForm = false } = {}) => {
@@ -215,6 +305,9 @@ export default function InferenceConfigPanel({
       if (resetForm || lastDeviceRef.current !== normalizedDeviceId) {
         setFormState(toInferenceFormState(data?.current?.settings || {}));
         setFieldErrors({});
+        setExpandedSections(DEFAULT_SECTION_STATE);
+        setShowAdvancedDiagnostics(false);
+        setShowRawJson(false);
         lastDeviceRef.current = normalizedDeviceId;
       }
     } catch (err) {
@@ -254,11 +347,26 @@ export default function InferenceConfigPanel({
     () => buildInferencePatch(baseSettings, formState),
     [baseSettings, formState]
   );
+
+  const dirtyReviewRows = useMemo(() => patchState.changedKeys.map(field => {
+    const meta = INFERENCE_FIELD_META[field];
+    return {
+      field,
+      label: meta.label,
+      before: formatValue(baseSettings[field], meta),
+      after: formatValue(patchState.normalizedValues[field], meta),
+    };
+  }), [baseSettings, patchState.changedKeys, patchState.normalizedValues]);
+
   const activeStatus = summary?.pending_request ? 'pending' : (summary?.current?.status || 'none');
   const deviceCurrentStatus = summary?.device?.current_status || deviceStatus || 'offline';
   const mqttAvailable = summary?.device?.mqtt_ok ?? mqttOk;
   const isReachable = deviceCurrentStatus !== 'offline' && deviceCurrentStatus !== 'error' && mqttAvailable === true;
   const transport = summary?.transport || {};
+  const current = summary?.current || {};
+  const pendingRequest = summary?.pending_request;
+  const requestId = pendingRequest?.request_id ?? current.request_id ?? '—';
+  const requestVersion = pendingRequest?.config_version ?? current.config_version ?? '—';
   const lastPublishEvent = transport?.last_publish_event;
   const lastPublishPayload = lastPublishEvent?.payload_json || {};
   const publishConfirmed = lastPublishEvent?.event_type === 'inference_config_publish_confirmed';
@@ -330,33 +438,96 @@ export default function InferenceConfigPanel({
     }
   }, [normalizedDeviceId, isReachable, summary, patchState, loadConfig]);
 
+  const toggleSection = useCallback((sectionId) => {
+    setExpandedSections(prev => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  }, []);
+
+  const getChangedCount = useCallback((fields) => fields.filter(field => patchState.changedKeys.includes(field)).length, [patchState.changedKeys]);
+
+  const renderFields = (fields) => {
+    const fullWidthFields = fields.filter(field => INFERENCE_FIELD_META[field].layout === 'full');
+    const halfWidthFields = fields.filter(field => INFERENCE_FIELD_META[field].layout !== 'full');
+
+    return (
+      <div className="space-y-4">
+        {fullWidthFields.length > 0 && (
+          <div className="space-y-4">
+            {fullWidthFields.map(field => renderFieldInput({
+              field,
+              meta: INFERENCE_FIELD_META[field],
+              value: formState[field],
+              isChanged: patchState.changedKeys.includes(field),
+              fieldError: fieldErrors[field],
+              isReachable,
+              handleFieldChange,
+            }))}
+          </div>
+        )}
+
+        {halfWidthFields.length > 0 && (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {halfWidthFields.map(field => renderFieldInput({
+              field,
+              meta: INFERENCE_FIELD_META[field],
+              value: formState[field],
+              isChanged: patchState.changedKeys.includes(field),
+              fieldError: fieldErrors[field],
+              isReachable,
+              handleFieldChange,
+            }))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderGroupContent = (group) => {
+    if (group.id !== 'detection') {
+      return renderFields(group.fields);
+    }
+
+    return (
+      <div className="space-y-4">
+        {DETECTION_SUBGROUPS.map(subgroup => {
+          const fields = group.fields.filter(field => INFERENCE_FIELD_META[field].subgroup === subgroup.id);
+          if (fields.length === 0) return null;
+          return (
+            <SectionSubgroup key={subgroup.id} label={subgroup.label}>
+              {renderFields(fields)}
+            </SectionSubgroup>
+          );
+        })}
+      </div>
+    );
+  };
+
   if (loading) {
     return <div className="flex-1 flex items-center justify-center text-gray-500 text-xs">Loading inference config...</div>;
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4 pb-28">
       {!normalizedDeviceId && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           Invalid device selection. Inference publish requires a canonical device ID string such as <span className="font-mono">TOWER-001</span>.
         </div>
       )}
 
       {!isReachable && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           Device offline / MQTT unavailable. Settings are read-only until the device becomes reachable.
         </div>
       )}
 
       {publishFailed && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           Backend could not confirm publish to broker.
           {lastPublishPayload?.error ? ` ${lastPublishPayload.error}` : ''}
         </div>
       )}
 
       {summary?.pending_request && (
-        <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-[11px] text-cyan-200">
+        <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
           {publishConfirmed ? (
             <>
               Backend publish confirmed to broker, but no ACK has been observed on <span className="font-mono break-all">{transport?.applied_topic || `devices/${normalizedDeviceId || deviceId}/inference/config/applied`}</span>.
@@ -372,143 +543,133 @@ export default function InferenceConfigPanel({
       )}
 
       {summary?.current?.source === 'draft_desired' && (
-        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-[11px] text-yellow-200">
+        <div className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-100">
           Confirmed ACK snapshot not found. Form is bootstrapped from the latest desired draft.
         </div>
       )}
 
       {notice && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-[11px] text-emerald-200">
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
           {notice}
         </div>
       )}
 
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[11px] text-red-200">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
           {error}
         </div>
       )}
 
-      <AckStatusCard summary={summary} />
-      <TransportDiagnosticsCard transport={transport} />
-
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div className="rounded-lg border border-gray-900 bg-gray-950 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">Next Config Version</div>
-            <div className="text-sm font-bold text-white font-mono">{summary?.next_config_version || 1}</div>
-          </div>
-          <div className={`rounded-lg border px-3 py-2 ${INFERENCE_STATUS_CLASS[activeStatus] || INFERENCE_STATUS_CLASS.none}`}>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">Current State</div>
-            <div className="text-sm font-bold">{formatStatusLabel(activeStatus)}</div>
-          </div>
-        </div>
-
-        {INFERENCE_FIELD_GROUPS.map(group => (
-          <div key={group.id} className="rounded-lg border border-gray-900 bg-gray-950 p-3 space-y-3">
-            <div className="text-[10px] uppercase tracking-wider text-cyan-300">{group.label}</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {group.fields.map(field => {
-                const meta = INFERENCE_FIELD_META[field];
-                const value = formState[field];
-                const isChanged = patchState.changedKeys.includes(field);
-                const inputClass = `w-full rounded border bg-black px-2 py-1.5 text-xs text-gray-100 ${
-                  isChanged ? 'border-cyan-500/40' : 'border-gray-800'
-                }`;
-
-                return (
-                  <label key={field} className="block space-y-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] uppercase tracking-wider text-gray-400">{meta.label}</span>
-                      {isChanged && (
-                        <span className="text-[10px] text-cyan-300 uppercase tracking-wider">changed</span>
-                      )}
-                    </div>
-                    {meta.type === 'boolean' ? (
-                      <label className="inline-flex items-center gap-2 text-xs text-gray-200">
-                        <input
-                          type="checkbox"
-                          checked={value === true}
-                          disabled={!isReachable}
-                          onChange={(e) => handleFieldChange(field, e.target.checked)}
-                        />
-                        {value === true ? 'Enabled' : value === false ? 'Disabled' : 'Not Set'}
-                      </label>
-                    ) : meta.type === 'array' ? (
-                      <textarea
-                        className={`${inputClass} min-h-[88px] font-mono`}
-                        value={value}
-                        disabled={!isReachable}
-                        onChange={(e) => handleFieldChange(field, e.target.value)}
-                      />
-                    ) : (
-                      <input
-                        className={inputClass}
-                        type={meta.type === 'text' ? 'text' : 'number'}
-                        value={value}
-                        min={meta.min}
-                        max={meta.max}
-                        step={meta.step}
-                        disabled={!isReachable}
-                        onChange={(e) => handleFieldChange(field, e.target.value)}
-                      />
-                    )}
-                    {fieldErrors[field] && (
-                      <div className="text-[11px] text-red-300">{fieldErrors[field]}</div>
-                    )}
-                  </label>
-                );
-              })}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <SummaryCard
+          title="Current State"
+          toneClass={INFERENCE_STATUS_CLASS[activeStatus] || INFERENCE_STATUS_CLASS.none}
+          meta={`v${requestVersion}`}
+        >
+          <div className="space-y-3">
+            <div className="text-xl font-semibold">{formatStatusLabel(activeStatus)}</div>
+            <div className="grid grid-cols-1 gap-2">
+              <LabeledValue label="Applied Time" value={formatTs(current.applied_at)} mono />
+              <LabeledValue label="Next Config Version" value={summary?.next_config_version || 1} mono />
             </div>
           </div>
-        ))}
+        </SummaryCard>
 
-        <div className="rounded-lg border border-gray-900 bg-gray-950 p-3 space-y-2">
-          <div className="text-[10px] uppercase tracking-wider text-gray-500">Changed Fields</div>
-          {patchState.changedKeys.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {patchState.changedKeys.map(key => (
-                <span key={key} className="px-2 py-1 rounded border border-cyan-500/30 bg-cyan-500/10 text-[10px] text-cyan-200">
-                  {key}
-                </span>
-              ))}
+        <SummaryCard title="Publish Health">
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2">
+              <LabeledValue label="Publish Result" value={publishFailed ? 'Failed' : publishConfirmed ? 'Confirmed' : 'Not Observed'} />
+              <LabeledValue label="ACK Observed" value={transport?.last_ack_event?.ack_received_at ? formatTs(transport.last_ack_event.ack_received_at) : 'No'} mono />
+              <LabeledValue label="Pending Age" value={formatDurationSeconds(transport?.pending_age_s)} mono />
             </div>
-          ) : (
-            <div className="text-[11px] text-gray-500">No unsaved changes</div>
-          )}
-        </div>
+          </div>
+        </SummaryCard>
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={saving || !normalizedDeviceId || !isReachable || !!summary?.pending_request || patchState.changedKeys.length === 0}
-            className="flex-1 rounded border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? 'Publishing...' : 'Publish Inference Config'}
-          </button>
-          <button
-            type="button"
-            onClick={handleReset}
-            className="rounded border border-gray-800 bg-black px-3 py-2 text-xs font-semibold text-gray-300"
-          >
-            Reset
-          </button>
-        </div>
-      </form>
-
-      <div className="rounded-lg border border-gray-900 bg-gray-950 p-3">
-        <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Current Effective Settings</div>
-        <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap break-all text-[11px] text-gray-300">
-          {JSON.stringify(summary?.current?.settings || {}, null, 2)}
-        </pre>
+        <SummaryCard title="Request Context" meta={requestId}>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2">
+              <LabeledValue label="Source" value={current.source || 'none'} />
+              <LabeledValue label="Container State" value={`${current.container?.name || '—'} / ${current.container?.state || '—'}`} />
+              <LabeledValue label="Changed Keys" value={pendingRequest?.changed_keys_json?.length || 0} mono />
+            </div>
+          </div>
+        </SummaryCard>
       </div>
 
-      {showHistorySection && (
-        <div className="rounded-lg border border-gray-900 bg-gray-950 p-3">
-          <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">History</div>
-          <InferenceHistoryList history={summary?.history || []} />
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {INFERENCE_FIELD_GROUPS.map(group => (
+          <CollapsibleSection
+            key={group.id}
+            label={group.label}
+            description={group.description}
+            changedCount={getChangedCount(group.fields)}
+            isOpen={!!expandedSections[group.id]}
+            onToggle={() => toggleSection(group.id)}
+          >
+            {renderGroupContent(group)}
+          </CollapsibleSection>
+        ))}
+
+        <DirtyReview rows={dirtyReviewRows} />
+
+        <AdvancedDisclosure
+          title="Advanced Diagnostics"
+          isOpen={showAdvancedDiagnostics}
+          onToggle={() => setShowAdvancedDiagnostics((value) => !value)}
+        >
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <LabeledValue label="Broker" value={`${transport?.broker_host || '—'}:${transport?.broker_port ?? '—'}`} mono />
+            <LabeledValue label="QoS / Retain" value={`${transport?.qos ?? '—'} / ${String(transport?.retain ?? false)}`} mono />
+            <LabeledValue label="Desired Topic" value={transport?.desired_topic || '—'} mono />
+            <LabeledValue label="Applied Topic" value={transport?.applied_topic || '—'} mono />
+            <LabeledValue label="Last Publish" value={`${formatTs(lastPublishEvent?.event_at)}${lastPublishPayload?.mid != null ? ` | mid: ${lastPublishPayload.mid}` : ''}`} mono />
+            <LabeledValue label="Request ID" value={requestId} mono />
+          </div>
+        </AdvancedDisclosure>
+
+        <AdvancedDisclosure
+          title="Raw JSON"
+          isOpen={showRawJson}
+          onToggle={() => setShowRawJson((value) => !value)}
+        >
+          <pre className="max-h-72 overflow-y-auto whitespace-pre-wrap break-all rounded-2xl border border-gray-800 bg-black/30 p-4 text-[12px] text-gray-300">
+            {JSON.stringify(summary?.current?.settings || {}, null, 2)}
+          </pre>
+        </AdvancedDisclosure>
+
+        {showHistorySection && (
+          <div className="rounded-2xl border border-gray-900 bg-gradient-to-b from-gray-950 to-[#050816] p-4">
+            <div className="mb-3 text-[10px] uppercase tracking-[0.24em] text-gray-500">History</div>
+            <InferenceHistoryList history={summary?.history || []} />
+          </div>
+        )}
+
+        <div className="sticky bottom-0 z-10 -mx-1 rounded-2xl border border-gray-900 bg-[#050816]/96 px-4 py-3 backdrop-blur">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="text-sm text-gray-400">
+              {patchState.changedKeys.length > 0
+                ? `${patchState.changedKeys.length} field change${patchState.changedKeys.length > 1 ? 's' : ''} ready to publish`
+                : 'No unsaved changes'}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleReset}
+                className="rounded-xl border border-gray-800 bg-black px-4 py-2.5 text-sm font-semibold text-gray-300"
+              >
+                Reset
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !normalizedDeviceId || !isReachable || !!summary?.pending_request || patchState.changedKeys.length === 0}
+                className="rounded-xl border border-cyan-500/40 bg-cyan-500/12 px-4 py-2.5 text-sm font-semibold text-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? 'Publishing...' : 'Publish Inference Config'}
+              </button>
+            </div>
+          </div>
         </div>
-      )}
+      </form>
     </div>
   );
 }
