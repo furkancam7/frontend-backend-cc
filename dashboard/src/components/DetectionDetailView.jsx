@@ -7,6 +7,7 @@ import { useUiTranslation } from '../i18n/useUiTranslation';
 export default function DetectionDetailView({
     recordId,
     detections,
+    detectionMetaByRecordId = {},
     onClose,
     onViewOnMap,
     isAdmin,
@@ -29,10 +30,14 @@ export default function DetectionDetailView({
     }, [recordCrops, selectedCrop]);
     
     const firstCrop = recordCrops[0];
-    const isPartial = firstCrop?.raw?.is_partial;
+    const recordMetadata = useMemo(
+        () => detectionMetaByRecordId?.[recordId] || null,
+        [detectionMetaByRecordId, recordId]
+    );
+    const isPartial = recordMetadata?.isPartial ?? firstCrop?.raw?.is_partial;
     const updatedAt = useMemo(() => {
-        return firstCrop?.raw?.updated_at || firstCrop?.captured_time || fallbackTime;
-    }, [firstCrop?.raw?.updated_at, firstCrop?.captured_time, fallbackTime]);
+        return recordMetadata?.updatedAt || firstCrop?.raw?.updated_at || firstCrop?.captured_time || fallbackTime;
+    }, [recordMetadata?.updatedAt, firstCrop?.raw?.updated_at, firstCrop?.captured_time, fallbackTime]);
 
     const activeTransfer = useMemo(
         () => activeTransfers.find((transfer) => transfer.record_id === recordId) || null,
@@ -51,6 +56,17 @@ export default function DetectionDetailView({
                 transfer: null,
             }
     ), [activeTransfer]);
+
+    useEffect(() => {
+        if (!import.meta.env.DEV) return;
+        if (!recordMetadata) return;
+        console.debug('[perf][metadata] detailPanelMetadataRefreshes', {
+            recordId,
+            updatedAt: recordMetadata.updatedAt ?? null,
+            imageStatus: recordMetadata.imageStatus ?? null,
+            isPartial: recordMetadata.isPartial ?? null
+        });
+    }, [recordId, recordMetadata]);
 
     useEffect(() => {
         const handleKeyDown = (e) => {

@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useState, useCallback, useMemo } from 'react'
+import React, { Suspense, lazy, useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import DetectionList from './components/DetectionList'
 import DataTable from './components/DataTable'
 import HeaderClock from './components/HeaderClock'
@@ -90,6 +90,7 @@ export default function App() {
 
   const {
     detections,
+    detectionMetaByRecordId,
     notifications,
     selectedContextCrop,
     fullFrameData,
@@ -101,6 +102,18 @@ export default function App() {
     handleUpdateDetection,
     setSelectedDetectionId
   } = useDetections(token, handleUnauthorized);
+  const prevDetectionsRef = useRef(detections);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const detectionsRefStable = prevDetectionsRef.current === detections;
+    console.debug('[perf][render] App detections reference', {
+      detectionsRefStable,
+      detectionsCount: detections.length,
+      metadataRecords: Object.keys(detectionMetaByRecordId || {}).length
+    });
+    prevDetectionsRef.current = detections;
+  }, [detections, detectionMetaByRecordId]);
 
   const {
     devices,
@@ -387,6 +400,7 @@ export default function App() {
                 <PanelContainer title={t('app.detections')} onClose={closePanel}>
                   <DetectionList
                     detections={detections}
+                    detectionMetaByRecordId={detectionMetaByRecordId}
                     onSelectDetection={handleSelectDetection}
                     onViewContext={handleViewContext}
                     onOpenDetail={(recordId) => handleOpenDetail(recordId, 'detections')}
@@ -422,7 +436,14 @@ export default function App() {
 
           {activeView === 'detail_view' && selectedRecordId && (
             <Suspense fallback={<OverlayLoader label={t('app.loadingDetectionDetail')} />}>
-              <LazyDetectionDetailView recordId={selectedRecordId} detections={detections} onClose={handleCloseDetailView} onViewOnMap={handleViewOnMap} isAdmin={isAdmin} />
+              <LazyDetectionDetailView
+                recordId={selectedRecordId}
+                detections={detections}
+                detectionMetaByRecordId={detectionMetaByRecordId}
+                onClose={handleCloseDetailView}
+                onViewOnMap={handleViewOnMap}
+                isAdmin={isAdmin}
+              />
             </Suspense>
           )}
 
@@ -452,6 +473,7 @@ export default function App() {
               <div className="flex-1 min-h-0">
                 <DataTable
                   detections={detections}
+                  detectionMetaByRecordId={detectionMetaByRecordId}
                   onOpenDetail={(recordId) => handleOpenDetail(recordId, 'datatable')}
                   onViewOnMap={handleViewOnMap}
                   isAdmin={isAdmin}

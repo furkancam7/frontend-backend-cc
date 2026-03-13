@@ -22,22 +22,6 @@ const DETECTIONS_CACHE_KEY = 'detectionsCache';
 const CACHE_TTL = 2 * 60 * 1000; 
 const UPDATE_DEBOUNCE_MS = 1000;
 const PERF_LOG_ENABLED = import.meta.env.DEV;
-const METADATA_ONLY_UPDATE_KEYS = new Set([
-  'record_id',
-  'crop_id',
-  'is_update',
-  'image_status',
-  'updated_at',
-  'chunks_received',
-  'chunks_total',
-  'transfer_status',
-  'partial_percent',
-  'partial_path',
-  'status',
-  'filename',
-  'started_at',
-  'last_activity'
-]);
 const MAP_RELEVANT_UPDATE_KEYS = new Set([
   'detection_data',
   'detections',
@@ -61,6 +45,24 @@ const MAP_RELEVANT_UPDATE_KEYS = new Set([
   'max_confidence',
   'boxes_count'
 ]);
+const METADATA_KEY_MAP = {
+  image_status: 'imageStatus',
+  updated_at: 'updatedAt',
+  is_partial: 'isPartial',
+  transfer_status: 'transferStatus',
+  chunks_received: 'chunksReceived',
+  chunks_total: 'chunksTotal',
+  partial_percent: 'partialPercent',
+  partial_path: 'partialPath',
+  started_at: 'startedAt',
+  last_activity: 'lastActivity',
+  meta_data: 'metaData'
+};
+const WEBSOCKET_METADATA_IGNORE_KEYS = new Set([
+  'record_id',
+  'crop_id',
+  'is_update'
+]);
 
 const hashCode = (str) => {
   let hash = 0;
@@ -69,6 +71,18 @@ const hashCode = (str) => {
     hash |= 0;
   }
   return hash.toString(36);
+};
+
+const serializeMetaValue = (value) => {
+  if (value == null) return '';
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value);
+    } catch (error) {
+      return String(value);
+    }
+  }
+  return String(value);
 };
 
 const getDetectionRecordId = (detection) =>
@@ -96,11 +110,47 @@ const getMapRelevantFingerprint = (detections) => {
   return `${detections.length}:${hashCode(signature)}`;
 };
 
-const extractDetectionMeta = (detection) => ({
-  recordId: getDetectionRecordId(detection),
-  imageStatus: detection?.raw?.image_status ?? detection?.image_status ?? null,
-  updatedAt: detection?.raw?.updated_at ?? null
-});
+const countMapRelevantItemChanges = (prevDetections = [], nextDetections = []) => {
+  const prevByCropId = new Map(
+    prevDetections.map((detection) => [String(detection?.crop_id ?? ''), getMapRelevantSignature(detection)])
+  );
+  let changedCount = 0;
+  nextDetections.forEach((detection) => {
+    const cropKey = String(detection?.crop_id ?? '');
+    if (!cropKey) return;
+    const prevSignature = prevByCropId.get(cropKey);
+    const nextSignature = getMapRelevantSignature(detection);
+    if (prevSignature !== nextSignature) {
+      changedCount += 1;
+    }
+  });
+  return changedCount;
+};
+
+const extractDetectionMeta = (detection) => {
+  const recordId = getDetectionRecordId(detection);
+  const raw = (detection?.raw && typeof detection.raw === 'object') ? detection.raw : {};
+  const meta = { recordId };
+
+  Object.entries(raw).forEach(([rawKey, value]) => {
+    const mappedKey = METADATA_KEY_MAP[rawKey];
+    if (!mappedKey || value === undefined) return;
+    meta[mappedKey] = value;
+  });
+
+  if (meta.imageStatus == null && detection?.image_status != null) {
+    meta.imageStatus = detection.image_status;
+  }
+
+  // Poll payloads may expose metadata at top-level instead of raw; prefer raw when both exist.
+  Object.entries(METADATA_KEY_MAP).forEach(([rawKey, mappedKey]) => {
+    if (meta[mappedKey] == null && detection?.[rawKey] !== undefined) {
+      meta[mappedKey] = detection[rawKey];
+    }
+  });
+
+  return meta;
+};
 
 const buildDetectionMetaByRecordId = (detections = []) => {
   const next = {};
@@ -110,14 +160,14 @@ const buildDetectionMetaByRecordId = (detections = []) => {
     const key = String(meta.recordId);
     const prev = next[key];
     if (!prev) {
-      next[key] = { recordId: key, imageStatus: meta.imageStatus, updatedAt: meta.updatedAt };
+      next[key] = { ...meta, recordId: key };
       return;
     }
-    const incomingUpdatedAt = meta.updatedAt || '';
-    const prevUpdatedAt = prev.updatedAt || '';
-    if (incomingUpdatedAt >= prevUpdatedAt) {
-      next[key] = { recordId: key, imageStatus: meta.imageStatus, updatedAt: meta.updatedAt };
-    }
+    const incomingUpdatedAt = meta.updatedAt ?? '';
+    const prevUpdatedAt = prev.updatedAt ?? '';
+    next[key] = incomingUpdatedAt >= prevUpdatedAt
+      ? { ...meta, recordId: key }
+      : prev;
   });
   return next;
 };
@@ -127,95 +177,29 @@ const getMetaFingerprint = (metaByRecordId) => {
     .sort()
     .map((recordId) => {
       const item = metaByRecordId[recordId] || {};
-      return `${recordId}:${item.imageStatus ?? ''}:${item.updatedAt ?? ''}`;
+      const itemEntries = Object.keys(item)
+        .filter((key) => key !== 'recordId')
+        .sort()
+        .map((key) => `${key}:${serializeMetaValue(item[key])}`)
+        .join(',');
+      return `${recordId}:${itemEntries}`;
     })
     .join('|');
   return `${Object.keys(metaByRecordId || {}).length}:${hashCode(entries)}`;
 };
 
 const patchMetadataMapByRecordId = (prevMetaByRecordId, recordId, patch) => {
-  if (!recordId || (!patch?.imageStatus && !patch?.updatedAt)) return prevMetaByRecordId;
+  if (!recordId || !patch || Object.keys(patch).length === 0) return prevMetaByRecordId;
   const key = String(recordId);
-  const prev = prevMetaByRecordId[key] || { recordId: key, imageStatus: null, updatedAt: null };
-  const next = {
-    ...prev,
-    imageStatus: patch.imageStatus ?? prev.imageStatus,
-    updatedAt: patch.updatedAt ?? prev.updatedAt
-  };
-  if (prev.imageStatus === next.imageStatus && prev.updatedAt === next.updatedAt) return prevMetaByRecordId;
+  const prev = prevMetaByRecordId[key] || { recordId: key };
+  const next = { ...prev, ...patch, recordId: key };
+  const prevFingerprint = getMetaFingerprint({ [key]: prev });
+  const nextFingerprint = getMetaFingerprint({ [key]: next });
+  if (prevFingerprint === nextFingerprint) return prevMetaByRecordId;
   return {
     ...prevMetaByRecordId,
     [key]: next
   };
-};
-
-const patchDetectionsMetadataByRecordId = (prevDetections, recordId, patch) => {
-  if (!recordId || (!patch?.imageStatus && !patch?.updatedAt)) return prevDetections;
-  const key = String(recordId);
-  let changed = false;
-  const next = prevDetections.map((detection) => {
-    if (String(getDetectionRecordId(detection) ?? '') !== key) return detection;
-
-    const nextRaw = detection?.raw ? { ...detection.raw } : {};
-    let itemChanged = false;
-    if (patch.imageStatus && nextRaw.image_status !== patch.imageStatus) {
-      nextRaw.image_status = patch.imageStatus;
-      itemChanged = true;
-    }
-    if (patch.updatedAt && nextRaw.updated_at !== patch.updatedAt) {
-      nextRaw.updated_at = patch.updatedAt;
-      itemChanged = true;
-    }
-
-    const nextTopLevelStatus = patch.imageStatus ?? detection.image_status;
-    if (itemChanged || detection.image_status !== nextTopLevelStatus) {
-      changed = true;
-      return {
-        ...detection,
-        raw: nextRaw,
-        image_status: nextTopLevelStatus
-      };
-    }
-    return detection;
-  });
-  return changed ? next : prevDetections;
-};
-
-const mergeMetadataFromCollection = (prevDetections, incomingDetections) => {
-  if (!prevDetections?.length || !incomingDetections?.length) return prevDetections;
-  const incomingByCropId = new Map(
-    incomingDetections.map((detection) => [String(detection?.crop_id ?? ''), extractDetectionMeta(detection)])
-  );
-
-  let changed = false;
-  const next = prevDetections.map((detection) => {
-    const incomingMeta = incomingByCropId.get(String(detection?.crop_id ?? ''));
-    if (!incomingMeta) return detection;
-
-    const nextRaw = detection?.raw ? { ...detection.raw } : {};
-    let itemChanged = false;
-
-    if (incomingMeta.imageStatus != null && nextRaw.image_status !== incomingMeta.imageStatus) {
-      nextRaw.image_status = incomingMeta.imageStatus;
-      itemChanged = true;
-    }
-    if (incomingMeta.updatedAt != null && nextRaw.updated_at !== incomingMeta.updatedAt) {
-      nextRaw.updated_at = incomingMeta.updatedAt;
-      itemChanged = true;
-    }
-    if (!itemChanged && detection.image_status === incomingMeta.imageStatus) {
-      return detection;
-    }
-
-    changed = true;
-    return {
-      ...detection,
-      raw: nextRaw,
-      image_status: incomingMeta.imageStatus ?? detection.image_status
-    };
-  });
-
-  return changed ? next : prevDetections;
 };
 
 const normalizeWebSocketUpdate = (payload) => {
@@ -236,13 +220,35 @@ const normalizeWebSocketUpdate = (payload) => {
   };
 };
 
-const isMetadataOnlyUpdate = (rawPayload) => {
-  if (!rawPayload || typeof rawPayload !== 'object') return false;
+const buildMetadataPatchFromUpdate = (normalizedUpdate) => {
+  const patch = {};
+  const rawPayload = normalizedUpdate?.rawPayload || {};
+
+  Object.entries(rawPayload).forEach(([rawKey, value]) => {
+    if (value === undefined) return;
+    if (WEBSOCKET_METADATA_IGNORE_KEYS.has(rawKey)) return;
+    if (MAP_RELEVANT_UPDATE_KEYS.has(rawKey)) return;
+    const mappedKey = METADATA_KEY_MAP[rawKey] || rawKey;
+    patch[mappedKey] = value;
+  });
+
+  if (normalizedUpdate?.imageStatus != null) patch.imageStatus = normalizedUpdate.imageStatus;
+  if (normalizedUpdate?.updatedAt != null) patch.updatedAt = normalizedUpdate.updatedAt;
+
+  return patch;
+};
+
+const classifyWebSocketUpdate = (rawPayload) => {
+  if (!rawPayload || typeof rawPayload !== 'object') return 'map-relevant';
   const keys = Object.keys(rawPayload).filter((key) => rawPayload[key] !== undefined);
-  if (!keys.length) return false;
-  if (!rawPayload.record_id && !rawPayload.crop_id) return false;
-  if (keys.some((key) => MAP_RELEVANT_UPDATE_KEYS.has(key))) return false;
-  return keys.every((key) => METADATA_ONLY_UPDATE_KEYS.has(key));
+  if (!keys.length) return 'map-relevant';
+  if (rawPayload.is_update === false) return 'map-relevant';
+  if (keys.some((key) => MAP_RELEVANT_UPDATE_KEYS.has(key))) return 'map-relevant';
+
+  // Future-proof boundary:
+  // known map/collection keys trigger refresh; unknown keys with record identity stay metadata-only.
+  const hasIdentity = rawPayload.record_id != null || rawPayload.crop_id != null;
+  return hasIdentity ? 'metadata-only' : 'map-relevant';
 };
 
 const hasMapRelevantPayload = (normalizedUpdate) => {
@@ -291,6 +297,7 @@ export default function useDetections(token, onUnauthorized) {
   const [detectionMetaByRecordId, setDetectionMetaByRecordId] = useState(() =>
     buildDetectionMetaByRecordId(loadCachedDetections())
   );
+  const detectionMetaRef = useRef(detectionMetaByRecordId);
   const detectionsReqId = useRef(0);
   const detectionsInFlight = useRef(false);
   const contextReqId = useRef(0);
@@ -305,8 +312,16 @@ export default function useDetections(token, onUnauthorized) {
     websocketDetectionUpdatesReceived: 0,
     metadataOnlyUpdatesReceived: 0,
     mapRelevantUpdatesReceived: 0,
-    fullDetectionsReloadCount: 0
+    metadataPatchedWithoutDetectionsMutation: 0,
+    pollMetadataOnlyMergeCount: 0,
+    stableDetectionsNoOpEvents: 0,
+    detectionsCollectionReplacements: 0,
+    detectionsItemReplacements: 0
   });
+
+  useEffect(() => {
+    detectionMetaRef.current = detectionMetaByRecordId;
+  }, [detectionMetaByRecordId]);
 
   const bumpPerfCounter = useCallback((counterKey, details = {}) => {
     if (!PERF_LOG_ENABLED) return;
@@ -338,12 +353,12 @@ export default function useDetections(token, onUnauthorized) {
       contextCache.current.delete(update.recordId);
     }
 
-    const metadataOnlyUpdate = isMetadataOnlyUpdate(update.rawPayload);
+    const updateType = classifyWebSocketUpdate(update.rawPayload);
 
     // Update routing:
     // - metadata-only update => patch metadata state only, no full collection reload.
     // - map-relevant/unknown update => debounce full collection reload for correctness.
-    if (!metadataOnlyUpdate) {
+    if (updateType !== 'metadata-only') {
       bumpPerfCounter('mapRelevantUpdatesReceived', {
         reason: update.isUpdate === false
           ? 'insert'
@@ -361,17 +376,27 @@ export default function useDetections(token, onUnauthorized) {
       imageStatus: update.imageStatus
     });
 
-    const metadataPatch = {
-      imageStatus: update.imageStatus ?? null,
-      updatedAt: update.updatedAt ?? null
-    };
+    const metadataPatch = buildMetadataPatchFromUpdate(update);
+    const nextMetaByRecordId = patchMetadataMapByRecordId(
+      detectionMetaRef.current,
+      metadataTargetId,
+      metadataPatch
+    );
 
-    setDetectionMetaByRecordId((prevMetaByRecordId) =>
-      patchMetadataMapByRecordId(prevMetaByRecordId, metadataTargetId, metadataPatch)
-    );
-    setDetections((prevDetections) =>
-      patchDetectionsMetadataByRecordId(prevDetections, metadataTargetId, metadataPatch)
-    );
+    if (nextMetaByRecordId === detectionMetaRef.current) {
+      bumpPerfCounter('stableDetectionsNoOpEvents', {
+        source: 'websocket_metadata_noop',
+        recordId: metadataTargetId
+      });
+      return;
+    }
+
+    detectionMetaRef.current = nextMetaByRecordId;
+    setDetectionMetaByRecordId(nextMetaByRecordId);
+    bumpPerfCounter('metadataPatchedWithoutDetectionsMutation', {
+      recordId: metadataTargetId,
+      patchedKeys: Object.keys(metadataPatch)
+    });
   }, [bumpPerfCounter, scheduleDetectionsRefresh]);
   
   const { isConnected: wsConnected } = useDetectionWebSocket(handleWebSocketUpdate, !!token, {
@@ -401,23 +426,37 @@ export default function useDetections(token, onUnauthorized) {
             const prevMapFingerprint = getMapRelevantFingerprint(prev);
             const nextMapFingerprint = getMapRelevantFingerprint(newDetections);
             if (prevMapFingerprint === nextMapFingerprint) {
-              return mergeMetadataFromCollection(prev, newDetections);
+              bumpPerfCounter('pollMetadataOnlyMergeCount', {
+                prevCount: prev.length,
+                nextCount: newDetections.length
+              });
+              bumpPerfCounter('stableDetectionsNoOpEvents', {
+                source: 'poll_map_fingerprint_stable'
+              });
+              return prev;
             }
-            bumpPerfCounter('fullDetectionsReloadCount', {
+            const changedItems = countMapRelevantItemChanges(prev, newDetections);
+            bumpPerfCounter('detectionsCollectionReplacements', {
               prevCount: prev.length,
-              nextCount: newDetections.length
+              nextCount: newDetections.length,
+              changedItems
+            });
+            bumpPerfCounter('detectionsItemReplacements', {
+              count: changedItems
             });
             saveCachedDetections(newDetections);
             return newDetections;
           });
 
-          setDetectionMetaByRecordId((prevMetaByRecordId) => {
-            const nextMetaByRecordId = buildDetectionMetaByRecordId(newDetections);
-            if (getMetaFingerprint(prevMetaByRecordId) === getMetaFingerprint(nextMetaByRecordId)) {
-              return prevMetaByRecordId;
-            }
-            return nextMetaByRecordId;
-          });
+          const nextMetaByRecordId = buildDetectionMetaByRecordId(newDetections);
+          if (getMetaFingerprint(detectionMetaRef.current) !== getMetaFingerprint(nextMetaByRecordId)) {
+            detectionMetaRef.current = nextMetaByRecordId;
+            setDetectionMetaByRecordId(nextMetaByRecordId);
+          } else {
+            bumpPerfCounter('stableDetectionsNoOpEvents', {
+              source: 'poll_metadata_fingerprint_stable'
+            });
+          }
 
           newDetections.forEach(det => {
             if (!processedDetectionIds.current.has(det.crop_id)) {
@@ -558,18 +597,46 @@ export default function useDetections(token, onUnauthorized) {
   }, []);
 
   const handleUpdateDetection = useCallback((cropId, newData) => {
-    setDetections(prev => prev.map(d => {
-      if (d.crop_id === cropId) {
+    setDetections(prev => {
+      let changedCount = 0;
+      const next = prev.map(d => {
+        if (d.crop_id !== cropId) return d;
+        const nextClass = newData.class || d.class;
+        const nextAccuracy = newData.accuracy || d.accuracy;
+        const nextDeviceId = newData.device_id || d.device_id;
+        if (d.class === nextClass && d.accuracy === nextAccuracy && d.device_id === nextDeviceId) {
+          return d;
+        }
+        changedCount += 1;
         return {
           ...d,
-          class: newData.class || d.class,
-          accuracy: newData.accuracy || d.accuracy,
-          device_id: newData.device_id || d.device_id
+          class: nextClass,
+          accuracy: nextAccuracy,
+          device_id: nextDeviceId
         };
+      });
+
+      if (changedCount === 0) {
+        bumpPerfCounter('stableDetectionsNoOpEvents', {
+          source: 'manual_update_noop',
+          cropId
+        });
+        return prev;
       }
-      return d;
-    }));
-  }, []);
+
+      bumpPerfCounter('detectionsCollectionReplacements', {
+        source: 'manual_update',
+        prevCount: prev.length,
+        nextCount: next.length,
+        changedItems: changedCount
+      });
+      bumpPerfCounter('detectionsItemReplacements', {
+        source: 'manual_update',
+        count: changedCount
+      });
+      return next;
+    });
+  }, [bumpPerfCounter]);
 
   return {
     detections,

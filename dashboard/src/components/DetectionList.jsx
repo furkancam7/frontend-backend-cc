@@ -137,6 +137,7 @@ const DetectionThumbnail = memo(({ src, crop, onOpenDetail, onViewContext, t }) 
 
 const DetectionItem = memo(({
     crop,
+    metadata,
     activeTransfer,
     isEditing,
     isAdmin,
@@ -170,7 +171,7 @@ const DetectionItem = memo(({
     }, [isEditing, crop.class, crop.device_id, crop.accuracy]);
 
     const isReceiving = !!activeTransfer;
-    const isPartial = !isReceiving && crop.raw?.is_partial;
+    const isPartial = !isReceiving && (metadata?.isPartial ?? crop.raw?.is_partial);
     const imageUrl = useMemo(() => {
         const timestamp = crop.captured_time || 'static';
         return `/api/image/crop/${crop.crop_id}?t=${encodeURIComponent(timestamp)}`;
@@ -357,6 +358,7 @@ const DetectionItem = memo(({
 
 function DetectionList({
     detections = [],
+    detectionMetaByRecordId = {},
     onSelectDetection,
     onViewContext,
     onOpenDetail,
@@ -528,6 +530,7 @@ function DetectionList({
                             >
                                 <DetectionItem
                                     crop={crop}
+                                    metadata={detectionMetaByRecordId[crop.record_id || crop.crop_id]}
                                     activeTransfer={activeTransfersByRecordId.get(crop.record_id)}
                                     isEditing={isEditingItem}
                                     isAdmin={isAdmin}

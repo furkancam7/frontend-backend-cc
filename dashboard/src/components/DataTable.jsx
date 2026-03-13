@@ -28,14 +28,14 @@ const apiReq = async (url, options = {}) => {
     return res.text(); 
 };
 
-const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, onViewOnMap, t }) => {
+const FullImageCell = React.memo(({ row, metadata, activeTransfer, hasAnyActiveTransfer, onViewOnMap, t }) => {
     const [imgError, setImgError] = useState(false);
     
     useEffect(() => {
         setImgError(false);
     }, [row.record_id]);
 
-    const isReceiving = activeTransfer || (hasAnyActiveTransfer && row.crops[0]?.raw?.is_partial);
+    const isReceiving = activeTransfer || (hasAnyActiveTransfer && (metadata?.isPartial ?? row.crops[0]?.raw?.is_partial));
     const imageUrl = useMemo(() => {
         if (imgError) return 'https://placehold.co/300x200/000000/666?text=No+Image';
         return `/api/image/fullframe/${row.record_id}?t=${encodeURIComponent(row.captured_time || Date.now())}`;
@@ -249,7 +249,7 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
     );
 });
 
-function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefresh, isActive = true }) {
+function DataTable({ detections = [], detectionMetaByRecordId = {}, onOpenDetail, onViewOnMap, isAdmin, onRefresh, isActive = true }) {
     const { t, i18n } = useUiTranslation(['dataTable']);
     const locale = toIntlLocale(i18n.resolvedLanguage);
     const [editingCropId, setEditingCropId] = useState(null);
@@ -367,6 +367,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                     <td className="p-3">
                                         <FullImageCell 
                                             row={row} 
+                                            metadata={detectionMetaByRecordId[row.record_id]}
                                             activeTransfer={activeTransfer} 
                                             hasAnyActiveTransfer={hasAnyActiveTransfer}
                                             onViewOnMap={onViewOnMap}

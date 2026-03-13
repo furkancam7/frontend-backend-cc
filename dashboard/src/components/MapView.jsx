@@ -402,7 +402,12 @@ const MapView = ({
         cropSourceSyncCount: 0,
         selectedHighlightUpdateCount: 0,
         popupRecreateCount: 0,
-        flyToCount: 0
+        flyToCount: 0,
+        mapViewDetectionsPropChanges: 0
+    });
+    const previousDetectionsRenderRef = useRef({
+        cropsRef: crops,
+        cropsFingerprint: ''
     });
 
     useEffect(() => { onCropSelectRef.current = onCropSelect; }, [onCropSelect]);
@@ -1163,6 +1168,23 @@ const MapView = ({
             .sort()
             .join('|');
     }, [crops]);
+
+    useEffect(() => {
+        if (!import.meta.env.DEV) return;
+        const prev = previousDetectionsRenderRef.current;
+        const detectionsRefStable = prev.cropsRef === crops;
+        const fingerprintChanged = prev.cropsFingerprint !== cropsFingerprint;
+        if (!detectionsRefStable) {
+            bumpPerfCounter('render', 'mapViewDetectionsPropChanges', {
+                detectionsCount: crops.length,
+                fingerprintChanged
+            });
+        }
+        previousDetectionsRenderRef.current = {
+            cropsRef: crops,
+            cropsFingerprint
+        };
+    }, [bumpPerfCounter, crops, cropsFingerprint]);
 
     useEffect(() => {
         if (cropsFingerprint !== lastReportedCropsFingerprintRef.current) {
