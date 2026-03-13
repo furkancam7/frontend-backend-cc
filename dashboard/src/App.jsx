@@ -147,6 +147,7 @@ export default function App() {
   const [activeAlarms, setActiveAlarms] = useState([]);
   const [selectedRecordId, setSelectedRecordId] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [requestedHealthTab, setRequestedHealthTab] = useState(null);
   const isAdmin = isUserAdmin;
   const [mountedPanels, setMountedPanels] = useState({
     devices: false,
@@ -241,6 +242,30 @@ export default function App() {
     }
     setSelectedDeviceId(deviceId);
   }, [devices, flyToDevice, setSelectedDeviceId]);
+
+  const handleOpenHeartbeat = useCallback((device) => {
+    if (!device) return;
+
+    const deviceId = typeof device === 'string'
+      ? device.trim()
+      : (device.id || device.device_id || '').trim();
+    if (!deviceId) return;
+
+    const selectedDevice = typeof device === 'string'
+      ? devices.find(item => item.id === deviceId)
+      : device;
+
+    if (selectedDevice) {
+      flyToDevice(selectedDevice);
+    }
+
+    setSelectedDeviceId(deviceId);
+    setRequestedHealthTab({
+      tab: 'heartbeat',
+      nonce: `${deviceId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    });
+    openPanelView('health');
+  }, [devices, flyToDevice, openPanelView, setSelectedDeviceId]);
 
   const handleOpenDetail = useCallback((recordId) => {
     markPanelMounted('detections');
@@ -338,7 +363,12 @@ export default function App() {
             {mountedPanels.devices && (
               <div className={activeView === 'devices' ? 'h-full' : 'hidden h-full'}>
                 <PanelContainer title="System Devices" onClose={closePanel}>
-                  <DeviceStatus devices={devices} onSelectDevice={handleSelectDevice} isAdmin={isAdmin} />
+                  <DeviceStatus
+                    devices={devices}
+                    onSelectDevice={handleSelectDevice}
+                    isAdmin={isAdmin}
+                    onOpenHeartbeat={handleOpenHeartbeat}
+                  />
                 </PanelContainer>
               </div>
             )}
@@ -352,6 +382,7 @@ export default function App() {
                       selectedDeviceId={selectedDeviceId}
                       onSelectDevice={handleSelectDevice}
                       isActive={activeView === 'health' && isPanelOpen}
+                      requestedTab={requestedHealthTab}
                     />
                   </Suspense>
                 </PanelContainer>

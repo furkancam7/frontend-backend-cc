@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
+import HeartbeatConfigPanel from './HeartbeatConfigPanel';
 import InferenceConfigPanel from './InferenceConfigPanel';
 
 const TABS = [
@@ -7,6 +8,7 @@ const TABS = [
   { id: 'access', label: 'Access' },
   { id: 'network', label: 'Network' },
   { id: 'config', label: 'Config' },
+  { id: 'heartbeat', label: 'Heartbeat' },
   { id: 'inference', label: 'Inference' },
   { id: 'commands', label: 'Commands' },
 ];
@@ -82,7 +84,13 @@ function KeyValue({ label, value }) {
   );
 }
 
-export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSelectDevice, isActive = true }) {
+export default function DeviceHealthPanel({
+  devices = [],
+  selectedDeviceId,
+  onSelectDevice,
+  isActive = true,
+  requestedTab = null,
+}) {
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -165,6 +173,11 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
       onSelectDevice(devices[0].id);
     }
   }, [selectedId, selectedDevice, devices, onSelectDevice]);
+
+  useEffect(() => {
+    if (!requestedTab?.tab || requestedTab?.nonce == null) return;
+    setActiveTab(requestedTab.tab);
+  }, [requestedTab]);
 
   useEffect(() => {
     if (!isActive) return undefined;
@@ -517,6 +530,14 @@ export default function DeviceHealthPanel({ devices = [], selectedDeviceId, onSe
                 mqttOk={detail?.mqtt_ok ?? selectedDevice?.mqtt_ok}
                 isActive={isActive && activeTab === 'inference'}
                 refreshToken={managementTick}
+              />
+            )}
+
+            {activeTab === 'heartbeat' && (
+              <HeartbeatConfigPanel
+                deviceId={selectedId}
+                deviceStatus={status}
+                isActive={isActive && activeTab === 'heartbeat'}
               />
             )}
 

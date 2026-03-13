@@ -133,6 +133,7 @@ class InferenceAppliedAck(BaseModel):
     errors: list = Field(default_factory=list)
     container: Dict[str, Any] = Field(default_factory=dict)
     effective_settings: InferenceSettingsPatch = Field(default_factory=InferenceSettingsPatch)
+    verification: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("component")
     @classmethod
@@ -226,5 +227,6 @@ def normalize_inference_ack(payload: Any) -> Dict[str, Any]:
         "errors": ack.errors,
         "container": ack.container,
         "effective_settings": ack.effective_settings.model_dump(exclude_none=True),
+        "verification": ack.verification,
         "raw_json": payload,
     }

@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { api } from '../services/api';
-import HeartbeatConfigModal from './HeartbeatConfigModal';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
 
@@ -145,10 +144,9 @@ const DeviceView = ({ device, isAdmin, onEdit, onDelete }) => (
     </>
 );
 
-const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect }) => {
+const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect, onOpenHeartbeat }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [isCollapsed, setIsCollapsed] = useState(true);
-    const [showHeartbeat, setShowHeartbeat] = useState(false);
     const handleSave = useCallback(async (id, data) => {
         await onUpdate(id, data);
         setIsEditing(false);
@@ -179,7 +177,10 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect }) => {
                 <div className="flex items-center gap-2">
                     {/* Heartbeat icon button */}
                     <button
-                        onClick={(e) => { e.stopPropagation(); setShowHeartbeat(true); }}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenHeartbeat?.(device);
+                        }}
                         className="p-1 rounded-md text-gray-500 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
                         title="Heartbeat Config"
                     >
@@ -224,19 +225,11 @@ const DeviceCard = memo(({ device, isAdmin, onUpdate, onDelete, onSelect }) => {
                     )}
                 </>
             )}
-
-            {/* Heartbeat Config Modal */}
-            {showHeartbeat && (
-                <HeartbeatConfigModal
-                    deviceId={device.id}
-                    onClose={() => setShowHeartbeat(false)}
-                />
-            )}
         </div>
     );
 });
 
-function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate }) {
+function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate, onOpenHeartbeat }) {
     const [localDevices, setLocalDevices] = useState(devices || []);
     const [isAdding, setIsAdding] = useState(false);
     const [newDevice, setNewDevice] = useState({ device_id: '', address: '', latitude: '', longitude: '' });
@@ -358,6 +351,7 @@ function DeviceStatus({ devices, onSelectDevice, isAdmin, onDeviceUpdate }) {
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
                         onSelect={onSelectDevice}
+                        onOpenHeartbeat={onOpenHeartbeat}
                     />
                 ))}
                 {filteredDevices.length === 0 && (

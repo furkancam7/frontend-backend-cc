@@ -60,6 +60,7 @@ def test_normalize_inference_ack_accepts_valid_payload():
         "changed_keys": ["CONFIDENCE", "VIDEO_ENABLED"],
         "errors": [],
         "container": {"name": "stopfires-inference", "state": "healthy"},
+        "verification": {"healthy": True, "container_running": True},
         "effective_settings": {
             "CONFIDENCE": 0.35,
             "VIDEO_ENABLED": True,
@@ -72,6 +73,7 @@ def test_normalize_inference_ack_accepts_valid_payload():
     assert normalized["status"] == "applied"
     assert normalized["effective_settings"]["VIDEO_ENABLED"] is True
     assert normalized["effective_settings"]["CLASSES"] == []
+    assert normalized["verification"]["healthy"] is True
 
 
 def test_inference_topics_are_exact():
