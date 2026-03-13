@@ -1,6 +1,5 @@
 import React, { Suspense, lazy, useState, useCallback, useMemo } from 'react'
 import DetectionList from './components/DetectionList'
-import DeviceStatus from './components/DeviceStatus'
 import HeaderClock from './components/HeaderClock'
 import AlarmPanel from './components/AlarmPanel'
 import Login from './components/Login'
@@ -20,7 +19,7 @@ const Icon = React.memo(({ path, className = "w-5 h-5" }) => (
 ));
 Icon.displayName = 'Icon';
 
-const PANEL_VIEWS = ['devices', 'health', 'detections', 'notificationlog'];
+const PANEL_VIEWS = ['health', 'detections', 'notificationlog'];
 const LazyDeviceHealthPanel = lazy(() => import('./components/DeviceHealthPanel'));
 const LazyMapView = lazy(() => import('./components/MapView'));
 const LazyDataTable = lazy(() => import('./components/DataTable'));
@@ -147,10 +146,8 @@ export default function App() {
   const [activeAlarms, setActiveAlarms] = useState([]);
   const [selectedRecordId, setSelectedRecordId] = useState(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [requestedHealthTab, setRequestedHealthTab] = useState(null);
   const isAdmin = isUserAdmin;
   const [mountedPanels, setMountedPanels] = useState({
-    devices: false,
     health: false,
     detections: false,
     notificationlog: false,
@@ -243,30 +240,6 @@ export default function App() {
     setSelectedDeviceId(deviceId);
   }, [devices, flyToDevice, setSelectedDeviceId]);
 
-  const handleOpenHeartbeat = useCallback((device) => {
-    if (!device) return;
-
-    const deviceId = typeof device === 'string'
-      ? device.trim()
-      : (device.id || device.device_id || '').trim();
-    if (!deviceId) return;
-
-    const selectedDevice = typeof device === 'string'
-      ? devices.find(item => item.id === deviceId)
-      : device;
-
-    if (selectedDevice) {
-      flyToDevice(selectedDevice);
-    }
-
-    setSelectedDeviceId(deviceId);
-    setRequestedHealthTab({
-      tab: 'heartbeat',
-      nonce: `${deviceId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    });
-    openPanelView('health');
-  }, [devices, flyToDevice, openPanelView, setSelectedDeviceId]);
-
   const handleOpenDetail = useCallback((recordId) => {
     markPanelMounted('detections');
     setSelectedRecordId(recordId);
@@ -342,7 +315,6 @@ export default function App() {
             </button>
 
             <div className={`flex flex-col items-center gap-4 w-full flex-1 transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible h-0'}`}>
-              <NavButton icon="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" title="Devices" isActive={activeView === 'devices' && isPanelOpen} onClick={() => handleToolbarClick('devices')} />
               <NavButton icon="M3 5h18M3 12h18M3 19h18M8 5v14M16 5v14" title="Health" isActive={activeView === 'health' && isPanelOpen} activeColor="text-cyan-400" onClick={() => handleToolbarClick('health')} />
               <NavButton icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" title="Detections" isActive={activeView === 'detections' && isPanelOpen} onClick={() => handleToolbarClick('detections')} />
               <NavButton icon="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" title="Table" isActive={activeView === 'datatable'} activeColor="text-emerald-500" onClick={() => { setActiveView('datatable'); setIsPanelOpen(false); }} />
@@ -360,19 +332,6 @@ export default function App() {
 
         {!isFullScreen && hasMountedPanels && (
           <div className={`${isPanelOpen ? `${panelWidthClass} border-r border-gray-800` : 'w-0 border-r-0'} bg-[#0f0f0f] z-30 shadow-2xl h-full flex-shrink-0 overflow-hidden transition-[width] duration-200 ease-out`}>
-            {mountedPanels.devices && (
-              <div className={activeView === 'devices' ? 'h-full' : 'hidden h-full'}>
-                <PanelContainer title="System Devices" onClose={closePanel}>
-                  <DeviceStatus
-                    devices={devices}
-                    onSelectDevice={handleSelectDevice}
-                    isAdmin={isAdmin}
-                    onOpenHeartbeat={handleOpenHeartbeat}
-                  />
-                </PanelContainer>
-              </div>
-            )}
-
             {mountedPanels.health && (
               <div className={activeView === 'health' ? 'h-full' : 'hidden h-full'}>
                 <PanelContainer title="Health" onClose={closePanel}>
@@ -382,7 +341,7 @@ export default function App() {
                       selectedDeviceId={selectedDeviceId}
                       onSelectDevice={handleSelectDevice}
                       isActive={activeView === 'health' && isPanelOpen}
-                      requestedTab={requestedHealthTab}
+                      onFocusDevice={handleSelectDevice}
                     />
                   </Suspense>
                 </PanelContainer>

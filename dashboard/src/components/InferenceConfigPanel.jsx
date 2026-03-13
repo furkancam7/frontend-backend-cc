@@ -143,12 +143,52 @@ function TransportDiagnosticsCard({ transport }) {
   );
 }
 
+export function InferenceHistoryList({ history = [], maxHeightClass = 'max-h-64' }) {
+  return (
+    <div className="space-y-2">
+      {history.map(row => (
+        <div key={row.id || row.request_id} className="rounded-xl border border-gray-800 bg-black/40 px-3 py-3 text-[11px] text-gray-300">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.22em] text-gray-500">Request</div>
+              <div className={`mt-1 break-all font-mono ${maxHeightClass ? '' : ''}`}>{row.request_id}</div>
+            </div>
+            <span className="rounded-full border border-gray-700 bg-gray-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-200">
+              {formatStatusLabel(row.ack_status || row.request_state)}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-2">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Version</div>
+              <div className="mt-1 text-sm font-semibold text-white font-mono">{row.config_version ?? '—'}</div>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-2">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Created</div>
+              <div className="mt-1 text-xs text-gray-200 font-mono">{formatTs(row.created_at)}</div>
+            </div>
+            <div className="rounded-lg border border-gray-800 bg-gray-950 px-2.5 py-2">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-gray-500">Applied</div>
+              <div className="mt-1 text-xs text-gray-200 font-mono">{formatTs(row.applied_at)}</div>
+            </div>
+          </div>
+        </div>
+      ))}
+      {history.length === 0 && (
+        <div className="rounded-xl border border-dashed border-gray-800 bg-gray-950/60 px-4 py-8 text-center text-[12px] text-gray-500">
+          No inference config history
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function InferenceConfigPanel({
   deviceId,
   deviceStatus,
   mqttOk,
   isActive = true,
   refreshToken = 0,
+  showHistorySection = true,
 }) {
   const normalizedDeviceId = normalizeDeviceId(deviceId);
   const [loading, setLoading] = useState(true);
@@ -463,25 +503,12 @@ export default function InferenceConfigPanel({
         </pre>
       </div>
 
-      <div className="rounded-lg border border-gray-900 bg-gray-950 p-3">
-        <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">History</div>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {(summary?.history || []).map(row => (
-            <div key={row.id || row.request_id} className="rounded border border-gray-900 bg-black/40 px-2 py-2 text-[11px] text-gray-300">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-mono">{row.request_id}</span>
-                <span>{formatStatusLabel(row.ack_status || row.request_state)}</span>
-              </div>
-              <div className="mt-1 font-mono text-gray-500">
-                v{row.config_version} | created: {formatTs(row.created_at)} | applied: {formatTs(row.applied_at)}
-              </div>
-            </div>
-          ))}
-          {(summary?.history || []).length === 0 && (
-            <div className="text-[11px] text-gray-500">No inference config history</div>
-          )}
+      {showHistorySection && (
+        <div className="rounded-lg border border-gray-900 bg-gray-950 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">History</div>
+          <InferenceHistoryList history={summary?.history || []} />
         </div>
-      </div>
+      )}
     </div>
   );
 }
