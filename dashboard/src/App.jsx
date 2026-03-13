@@ -22,7 +22,6 @@ Icon.displayName = 'Icon';
 const PANEL_VIEWS = ['health', 'detections', 'notificationlog'];
 const LazyDeviceHealthPanel = lazy(() => import('./components/DeviceHealthPanel'));
 const LazyMapView = lazy(() => import('./components/MapView'));
-const LazyDataTable = lazy(() => import('./components/DataTable'));
 const LazyDetectionDetailView = lazy(() => import('./components/DetectionDetailView'));
 const LazyLocationSettings = lazy(() => import('./components/settings/LocationSettings'));
 const LazyDetectionHistory = lazy(() => import('./components/DetectionHistory'));
@@ -317,8 +316,6 @@ export default function App() {
             <div className={`flex flex-col items-center gap-4 w-full flex-1 transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible h-0'}`}>
               <NavButton icon="M3 5h18M3 12h18M3 19h18M8 5v14M16 5v14" title="Health" isActive={activeView === 'health' && isPanelOpen} activeColor="text-cyan-400" onClick={() => handleToolbarClick('health')} />
               <NavButton icon="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" title="Detections" isActive={activeView === 'detections' && isPanelOpen} onClick={() => handleToolbarClick('detections')} />
-              <NavButton icon="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" title="Table" isActive={activeView === 'datatable'} activeColor="text-emerald-500" onClick={() => { setActiveView('datatable'); setIsPanelOpen(false); }} />
-              <NavButton icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" title="Settings" isActive={isSettingsOpen} activeColor="text-cyan-500" onClick={() => setIsSettingsOpen(!isSettingsOpen)} />
               <NavButton icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" title="Detection History" isActive={showHistory} activeColor="text-cyan-500" onClick={toggleHistory} />
               <NavButton icon="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" title="Detection Log" isActive={activeView === 'notificationlog' && isPanelOpen} activeColor="text-orange-500" onClick={() => handleToolbarClick('notificationlog')} badge={notificationLogs.length > 0 && <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full">{notificationLogs.length > 99 ? '99+' : notificationLogs.length}</span>} />
 
@@ -394,25 +391,6 @@ export default function App() {
         <main className="flex-1 relative bg-black transition-all duration-200 ease-out">
           <AlarmPanel alarms={activeAlarms} onAcknowledge={handleAcknowledgeAlarm} />
 
-          <div className={`absolute inset-0 z-20 bg-[#09090b] flex flex-col transition-opacity duration-200 ${activeView === 'datatable' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none hidden'}`}>
-              {activeView === 'datatable' && (
-                <Suspense fallback={<OverlayLoader label="Loading Table" />}>
-                  <LazyDataTable
-                    detections={detections}
-                    onOpenDetail={handleOpenDetail}
-                    onViewOnMap={handleViewOnMap}
-                    isAdmin={isAdmin}
-                    isActive
-                  />
-                </Suspense>
-              )}
-              {activeView === 'datatable' && (
-                <button onClick={() => setActiveView('live')} className="absolute top-4 right-4 text-gray-400 hover:text-white bg-black/50 p-2 rounded-full hover:bg-red-900/50 transition-colors z-50">
-                  <Icon path="M6 18L18 6M6 6l12 12" className="w-6 h-6" />
-                </button>
-              )}
-          </div>
-
           {activeView === 'detail_view' && selectedRecordId && (
             <Suspense fallback={<OverlayLoader label="Loading Detection Detail" />}>
               <LazyDetectionDetailView recordId={selectedRecordId} detections={detections} onClose={() => openPanelView('detections')} onViewOnMap={handleViewOnMap} isAdmin={isAdmin} />
@@ -473,6 +451,8 @@ export default function App() {
             hasSidePanel={(isPanelOpen || isSettingsOpen) && !isFullScreen}
             showHeatmap={showHeatmap}
             toggleHeatmap={toggleHeatmap}
+            isSettingsOpen={isSettingsOpen}
+            onToggleSettings={() => setIsSettingsOpen(prev => !prev)}
           />
 
         </main>
@@ -520,7 +500,7 @@ function PanelContainer({ title, titleColor = 'text-white', badge, onClose, chil
   );
 }
 
-function MapControls({ searchInputValue, setSearchInputValue, handleSearch, isFullScreen, isMapToolsOpen, isStyleMenuOpen, mapStyle, showDevices, showDetections, MAP_STYLES, toggleMapTools, toggleFullScreen, toggleStyleMenu, handleMapStyleChange, toggleDevices, toggleDetections, flyToHome, flyToResponsibleArea, hasSidePanel, showHeatmap, toggleHeatmap }) {
+function MapControls({ searchInputValue, setSearchInputValue, handleSearch, isFullScreen, isMapToolsOpen, isStyleMenuOpen, mapStyle, showDevices, showDetections, MAP_STYLES, toggleMapTools, toggleFullScreen, toggleStyleMenu, handleMapStyleChange, toggleDevices, toggleDetections, flyToHome, flyToResponsibleArea, hasSidePanel, showHeatmap, toggleHeatmap, isSettingsOpen, onToggleSettings }) {
   return (
     <>
       <div className={`absolute top-14 sm:top-4 z-[10] w-[calc(100%-5rem)] max-w-80 sm:w-80 transition-all duration-200 ${hasSidePanel ? 'left-[calc(50%+1rem)] -translate-x-1/2' : 'left-1/2 -translate-x-1/2 ml-6 sm:ml-0'}`}>
@@ -556,6 +536,9 @@ function MapControls({ searchInputValue, setSearchInputValue, handleSearch, isFu
             </div>
             <button onClick={toggleDevices} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center ${showDevices ? 'border-green-500 text-green-400 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'border-gray-700 text-gray-600'}`} title="Devices"><span className="text-[8px] sm:text-[9px] font-bold">DEV</span></button>
             <button onClick={toggleDetections} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center ${showDetections ? 'border-cyan-500 text-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.4)]' : 'border-gray-700 text-gray-600'}`} title="Detections"><Icon path="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></button>
+            <button onClick={onToggleSettings} className={`w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border rounded flex items-center justify-center transition-all ${isSettingsOpen ? 'border-cyan-500 text-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.4)]' : 'border-gray-700 text-gray-400 hover:text-white'}`} title="Location Settings">
+              <Icon path="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            </button>
             <button onClick={flyToHome} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#111]/90 border border-gray-700 rounded flex items-center justify-center text-gray-400 hover:text-cyan-400 hover:border-cyan-500 transition-all" title="Home Location">
               <Icon path="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </button>

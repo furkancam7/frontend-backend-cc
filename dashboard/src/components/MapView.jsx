@@ -524,16 +524,17 @@ const MapView = ({
             return;
         }
         
-        const hubDevices = currentDevices.filter(d => 
-            d.location && 
-            d.id.toLowerCase().includes('hub')
-        );
+        const coverageDevices = currentDevices.filter(d => {
+            if (!d?.location?.latitude || !d?.location?.longitude) return false;
+            const deviceId = String(d.id || '').toUpperCase();
+            return !deviceId.startsWith('SOLO');
+        });
         
-        const fingerprint = `visible:${hubDevices.map(d => `${d.id}:${d.location.longitude}:${d.location.latitude}`).join('|')}`;
+        const fingerprint = `visible:${coverageDevices.map(d => `${d.id}:${d.location.longitude}:${d.location.latitude}`).join('|')}`;
         if (fingerprint === lastDevicesFingerprintRef.current) return;
         lastDevicesFingerprintRef.current = fingerprint;
         
-        const features = hubDevices.map(d =>
+        const features = coverageDevices.map(d =>
             createGeoJSONCircle([d.location.longitude, d.location.latitude], 10, 16)
         );
         
