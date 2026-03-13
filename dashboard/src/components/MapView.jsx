@@ -41,6 +41,21 @@ const getLngLatFromLocation = (location) => {
     return lat === null || lng === null ? null : [lng, lat];
 };
 
+const getCropRenderSignature = (crop) => [
+    crop?.crop_id ?? '',
+    crop?.class ?? '',
+    toCoordinateNumber(crop?.location?.latitude) ?? '',
+    toCoordinateNumber(crop?.location?.longitude) ?? '',
+].join(':');
+
+const getHeatmapRenderSignature = (crop) => [
+    crop?.crop_id ?? '',
+    toCoordinateNumber(crop?.location?.latitude) ?? '',
+    toCoordinateNumber(crop?.location?.longitude) ?? '',
+    crop?.class ?? '',
+    crop?.accuracy ?? crop?.confidence ?? ''
+].join(':');
+
 const moveLayerBeforeIfNeeded = (map, layerId, beforeLayerId) => {
     if (!beforeLayerId || !map.getLayer(layerId) || !map.getLayer(beforeLayerId)) return;
 
@@ -152,12 +167,12 @@ const addCropLayers = (map) => {
                 source: sourceId,
                 filter: ['!', ['has', 'point_count']],
                 paint: {
-                    'circle-radius': ['case', ['boolean', ['get', 'selected'], false], 10, 7],
+                    'circle-radius': ['case', ['boolean', ['feature-state', 'selected'], false], 10, 7],
                     'circle-color': ['get', 'color'],
                     // Keep hit area/interactions, but hide detection circles visually.
                     'circle-opacity': 0,
-                    'circle-stroke-width': ['case', ['boolean', ['get', 'selected'], false], 2, 1.5],
-                    'circle-stroke-color': ['case', ['boolean', ['get', 'selected'], false], '#ffffff', ['get', 'borderColor']],
+                    'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 2, 1.5],
+                    'circle-stroke-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', ['get', 'borderColor']],
                     'circle-stroke-opacity': 0
                 }
             });
@@ -181,9 +196,9 @@ const addCropLayers = (map) => {
                     'text-padding': 4
                 },
                 paint: {
-                    'text-color': ['get', 'color'],
-                    'text-halo-color': '#000000',
-                    'text-halo-width': 2
+                    'text-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#FC581C', ['get', 'color']],
+                    'text-halo-color': ['case', ['boolean', ['feature-state', 'selected'], false], '#ffffff', '#000000'],
+                    'text-halo-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 2]
                 }
             });
         }
@@ -377,9 +392,18 @@ const MapView = ({
     const lastSoloZonesFingerprintRef = useRef('');
     const lastHeatmapFingerprintRef = useRef('');
     const lastEtaFingerprintRef = useRef('');
+    const selectedFeatureIdRef = useRef(null);
+    const lastReportedCropsFingerprintRef = useRef('');
     const etaPopupRef = useRef(null);
     const etaPopupRootRef = useRef(null);
     const onMapAnalysisClickRef = useRef(onMapAnalysisClick);
+    const perfCountersRef = useRef({
+        cropsFingerprintChangeCount: 0,
+        cropSourceSyncCount: 0,
+        selectedHighlightUpdateCount: 0,
+        popupRecreateCount: 0,
+        flyToCount: 0
+    });
 
     useEffect(() => { onCropSelectRef.current = onCropSelect; }, [onCropSelect]);
     useEffect(() => { onMapAnalysisClickRef.current = onMapAnalysisClick; }, [onMapAnalysisClick]);
@@ -393,6 +417,13 @@ const MapView = ({
     const devicePopupRef = useRef(null);
     const lastFlyToId = useRef(null);
     const lastActiveCropFingerprintRef = useRef('');
+
+    const bumpPerfCounter = useCallback((scope, key, details = {}) => {
+        if (!import.meta.env.DEV) return;
+        const next = (perfCountersRef.current[key] || 0) + 1;
+        perfCountersRef.current[key] = next;
+        console.debug(`[perf][${scope}] ${key}`, { count: next, ...details });
+    }, []);
     const hqCoords = getLngLatFromLocation(hqLocation);
     const initialView = hasValidCoordinates(hqLocation)
         ? {
@@ -448,7 +479,7 @@ const MapView = ({
             const feature = e.features[0];
             if (feature.properties.point_count) return;
             e.originalEvent.stopPropagation();
-            const cropId = feature.properties.id;
+            const cropId = feature.properties?.id ?? feature.id;
             const currentCrops = dataRef.current.crops || [];
             const crop = currentCrops.find(c => c.crop_id === cropId);
             if (crop && onCropSelectRef.current) {
@@ -501,36 +532,67 @@ const MapView = ({
 
     const setPointer = useCallback(() => { if (map.current) map.current.getCanvas().style.cursor = 'pointer'; }, []);
     const resetPointer = useCallback(() => { if (map.current) map.current.getCanvas().style.cursor = ''; }, [])
+    const syncSelectedFeatureState = useCallback((force = false) => {
+        if (!map.current || !map.current.isStyleLoaded()) return;
+        if (!map.current.getSource('source-crops-data')) return;
+
+        const nextSelectedId = dataRef.current.selectedDetectionId ?? null;
+        const prevSelectedId = selectedFeatureIdRef.current;
+
+        if (!force && prevSelectedId === nextSelectedId) return;
+        let didUpdate = false;
+
+        if (prevSelectedId != null && prevSelectedId !== nextSelectedId) {
+            try {
+                map.current.removeFeatureState({ source: 'source-crops-data', id: prevSelectedId }, 'selected');
+            } catch (e) { }
+            didUpdate = true;
+        }
+
+        if (nextSelectedId != null && (force || prevSelectedId !== nextSelectedId)) {
+            try {
+                map.current.setFeatureState(
+                    { source: 'source-crops-data', id: nextSelectedId },
+                    { selected: true }
+                );
+            } catch (e) { }
+            didUpdate = true;
+        }
+
+        selectedFeatureIdRef.current = nextSelectedId;
+        if (didUpdate) {
+            bumpPerfCounter('map', 'selectedHighlightUpdateCount', {
+                selectedDetectionId: nextSelectedId,
+                mode: force ? 'reapply' : 'transition'
+            });
+        }
+    }, [bumpPerfCounter]);
+
     const triggerCropUpdate = useCallback(() => {
         if (!map.current || !map.current.isStyleLoaded()) return;
         const currentCrops = dataRef.current.crops || [];
-        const currentSelectedDetectionId = dataRef.current.selectedDetectionId;
 
         if (!currentCrops.length) {
             if (lastCropsFingerprintRef.current !== 'empty') {
                 lastCropsFingerprintRef.current = 'empty';
                 const source = map.current.getSource('source-crops-data');
-                if (source) source.setData({ type: 'FeatureCollection', features: [] });
+                if (source) {
+                    source.setData({ type: 'FeatureCollection', features: [] });
+                    bumpPerfCounter('map', 'cropSourceSyncCount', { featureCount: 0, reason: 'empty' });
+                }
             }
+            syncSelectedFeatureState(true);
             return;
         }
 
         const fingerprint = currentCrops
-            .map(c => [
-                c.crop_id,
-                c.class || '',
-                toCoordinateNumber(c.location?.latitude) ?? '',
-                toCoordinateNumber(c.location?.longitude) ?? '',
-                c.raw?.updated_at || '',
-                c.raw?.image_status || '',
-            ].join(':'))
+            .map(getCropRenderSignature)
             .sort()
             .join('|');
-        const nextFingerprint = `${currentSelectedDetectionId}:${fingerprint}`;
-        if (nextFingerprint === lastCropsFingerprintRef.current) {
+        if (fingerprint === lastCropsFingerprintRef.current) {
             return;
         }
-        lastCropsFingerprintRef.current = nextFingerprint;
+        lastCropsFingerprintRef.current = fingerprint;
         const validCrops = currentCrops.filter(c => c && hasValidCoordinates(c.location));
         const spreadMap = spreadOverlappingDetections(validCrops, 30);
         const features = validCrops
@@ -549,13 +611,13 @@ const MapView = ({
 
                 return {
                     type: 'Feature',
+                    id: c.crop_id,
                     geometry: { type: 'Point', coordinates: [lng, lat] },
                     properties: {
                         id: c.crop_id,
                         class: (String(c.class ?? 'UNK') || 'UNK').toUpperCase(),
                         color,
-                        borderColor,
-                        selected: currentSelectedDetectionId === c.crop_id
+                        borderColor
                     }
                 };
             })
@@ -564,8 +626,10 @@ const MapView = ({
         const source = map.current.getSource('source-crops-data');
         if (source) {
             source.setData({ type: 'FeatureCollection', features });
+            bumpPerfCounter('map', 'cropSourceSyncCount', { featureCount: features.length, reason: 'crops_fingerprint' });
         }
-    }, []);
+        syncSelectedFeatureState(true);
+    }, [bumpPerfCounter, syncSelectedFeatureState]);
 
     const updateDeviceRadars = useCallback(() => {
         if (!map.current || !map.current.isStyleLoaded()) return;
@@ -661,7 +725,7 @@ const MapView = ({
             }
             return;
         }
-        const fingerprint = `${cropsData.length}:${cropsData.map(c => `${c.crop_id}:${c.raw?.updated_at || ''}:${c.raw?.image_status || ''}`).join('|')}`;
+        const fingerprint = `${cropsData.length}:${cropsData.map(getHeatmapRenderSignature).sort().join('|')}`;
         if (fingerprint === lastHeatmapFingerprintRef.current) return;
         lastHeatmapFingerprintRef.current = fingerprint;
         source.setData(createHeatmapGeoJSON(cropsData));
@@ -817,6 +881,10 @@ const MapView = ({
                     if (styleReady) triggerCropUpdate();
                     else pendingMapSyncTasksRef.current.add(task);
                     break;
+                case 'selection':
+                    if (styleReady) syncSelectedFeatureState();
+                    else pendingMapSyncTasksRef.current.add(task);
+                    break;
                 case 'heatmap':
                     if (styleReady) updateHeatmap();
                     else pendingMapSyncTasksRef.current.add(task);
@@ -845,7 +913,7 @@ const MapView = ({
             taskCount: tasks.length,
             deferredTaskCount: pendingMapSyncTasksRef.current.size
         });
-    }, [syncDeviceMarkers, triggerCropUpdate, updateDeviceRadars, updateETALine, updateHeatmap, updateSoloZones]);
+    }, [syncDeviceMarkers, syncSelectedFeatureState, triggerCropUpdate, updateDeviceRadars, updateETALine, updateHeatmap, updateSoloZones]);
 
     const scheduleMapSync = useCallback((...tasks) => {
         if (!map.current) return;
@@ -943,9 +1011,10 @@ const MapView = ({
                 lastSoloZonesFingerprintRef.current = '';
                 lastHeatmapFingerprintRef.current = '';
                 lastEtaFingerprintRef.current = '';
+                selectedFeatureIdRef.current = null;
                 ensureMapLayers(map.current);
                 // Ensure all tasks are queued for initial processing
-                ['markers', 'radars', 'soloZones', 'crops', 'heatmap', 'eta'].forEach(
+                ['markers', 'radars', 'soloZones', 'crops', 'selection', 'heatmap', 'eta'].forEach(
                     task => pendingMapSyncTasksRef.current.add(task)
                 );
                 runPendingMapSync();
@@ -956,7 +1025,7 @@ const MapView = ({
 
             map.current.on('load', handleStyleReady);
             map.current.once('style.load', handleStyleReady);
-            scheduleMapSync('markers', 'radars', 'soloZones', 'crops', 'heatmap', 'eta');
+            scheduleMapSync('markers', 'radars', 'soloZones', 'crops', 'selection', 'heatmap', 'eta');
             
             resizeObserver = new ResizeObserver(() => {
                 // Immediate resize via rAF for smooth visual update
@@ -993,6 +1062,7 @@ const MapView = ({
 
             if (map.current) {
                 mapLoadedRef.current = false;
+                selectedFeatureIdRef.current = null;
                 if (mapSyncFrameRef.current) {
                     cancelAnimationFrame(mapSyncFrameRef.current);
                     mapSyncFrameRef.current = null;
@@ -1028,7 +1098,7 @@ const MapView = ({
         currentStyleRef.current = mapStyle;
         mapLoadedRef.current = false;
         map.current.setStyle(mapStyle);
-        scheduleMapSync('markers', 'radars', 'soloZones', 'crops', 'heatmap', 'eta');
+        scheduleMapSync('markers', 'radars', 'soloZones', 'crops', 'selection', 'heatmap', 'eta');
         let styleHandled = false;
         const styleReloadStartedAt = performance.now();
         const onStyleLoad = () => {
@@ -1041,9 +1111,10 @@ const MapView = ({
             lastSoloZonesFingerprintRef.current = '';
             lastHeatmapFingerprintRef.current = '';
             lastEtaFingerprintRef.current = '';
+            selectedFeatureIdRef.current = null;
             ensureMapLayersRef.current(map.current);
             // Force full resync of all data after style reload
-            ['markers', 'radars', 'soloZones', 'crops', 'heatmap', 'eta'].forEach(
+            ['markers', 'radars', 'soloZones', 'crops', 'selection', 'heatmap', 'eta'].forEach(
                 task => pendingMapSyncTasksRef.current.add(task)
             );
             runPendingMapSync();
@@ -1063,7 +1134,8 @@ const MapView = ({
             lastSoloZonesFingerprintRef.current = '';
             lastHeatmapFingerprintRef.current = '';
             lastEtaFingerprintRef.current = '';
-            ['markers', 'radars', 'soloZones', 'crops', 'heatmap', 'eta'].forEach(
+            selectedFeatureIdRef.current = null;
+            ['markers', 'radars', 'soloZones', 'crops', 'selection', 'heatmap', 'eta'].forEach(
                 task => pendingMapSyncTasksRef.current.add(task)
             );
             runPendingMapSync();
@@ -1080,21 +1152,31 @@ const MapView = ({
     const cropsFingerprint = useMemo(() => {
         if (!crops || !crops.length) return 'empty';
         return crops
-            .map(c => [
-                c.crop_id,
-                c.class || '',
-                toCoordinateNumber(c.location?.latitude) ?? '',
-                toCoordinateNumber(c.location?.longitude) ?? '',
-                c.raw?.updated_at || '',
-                c.raw?.image_status || '',
-            ].join(':'))
+            .map(getCropRenderSignature)
+            .sort()
+            .join('|');
+    }, [crops]);
+    const heatmapFingerprint = useMemo(() => {
+        if (!crops || !crops.length) return 'empty';
+        return crops
+            .map(getHeatmapRenderSignature)
             .sort()
             .join('|');
     }, [crops]);
 
     useEffect(() => {
+        if (cropsFingerprint !== lastReportedCropsFingerprintRef.current) {
+            lastReportedCropsFingerprintRef.current = cropsFingerprint;
+            bumpPerfCounter('map', 'cropsFingerprintChangeCount', {
+                fingerprint: cropsFingerprint
+            });
+        }
         scheduleMapSync('crops');
-    }, [cropsFingerprint, scheduleMapSync, selectedDetectionId]);
+    }, [bumpPerfCounter, cropsFingerprint, scheduleMapSync]);
+
+    useEffect(() => {
+        scheduleMapSync('selection');
+    }, [scheduleMapSync, selectedDetectionId]);
 
     const devicesFingerprint = useMemo(() => {
         if (!devices || !devices.length) return 'empty';
@@ -1118,7 +1200,7 @@ const MapView = ({
 
     useEffect(() => {
         scheduleMapSync('heatmap');
-    }, [cropsFingerprint, scheduleMapSync, showHeatmap]);
+    }, [heatmapFingerprint, scheduleMapSync, showHeatmap]);
 
     useEffect(() => {
         scheduleMapSync('eta');
@@ -1143,7 +1225,7 @@ const MapView = ({
         if (!map.current) return;
 
         if (activeCrop && hasValidCoordinates(activeCrop.location)) {
-            const activeCropFingerprint = `${activeCrop.crop_id}:${activeCrop.class}:${activeCrop.accuracy}:${toCoordinateNumber(activeCrop.location.latitude) ?? ''}:${toCoordinateNumber(activeCrop.location.longitude) ?? ''}:${activeCrop.raw?.updated_at || ''}:${activeCrop.raw?.image_status || ''}`;
+            const activeCropFingerprint = `${activeCrop.crop_id}:${activeCrop.class}:${activeCrop.accuracy}:${toCoordinateNumber(activeCrop.location.latitude) ?? ''}:${toCoordinateNumber(activeCrop.location.longitude) ?? ''}`;
             if (activeCropFingerprint === lastActiveCropFingerprintRef.current) {
                 return;
             }
@@ -1164,10 +1246,17 @@ const MapView = ({
                 .setLngLat(activeCropCoords)
                 .setDOMContent(container)
                 .addTo(map.current);
+            bumpPerfCounter('popup', 'popupRecreateCount', {
+                cropId: activeCrop.crop_id
+            });
 
             if (activeCrop.crop_id !== lastFlyToId.current) {
                 map.current.flyTo({ center: activeCropCoords, zoom: 19, speed: 2 });
                 lastFlyToId.current = activeCrop.crop_id;
+                bumpPerfCounter('map', 'flyToCount', {
+                    reason: 'active_crop_selection',
+                    cropId: activeCrop.crop_id
+                });
             }
         } else {
             cleanupTacticalPopup();
@@ -1175,7 +1264,7 @@ const MapView = ({
             lastActiveCropFingerprintRef.current = '';
         }
 
-    }, [activeCrop, isAdmin, cleanupDevicePopup, cleanupTacticalPopup]);
+    }, [activeCrop, isAdmin, bumpPerfCounter, cleanupDevicePopup, cleanupTacticalPopup]);
 
 
     useEffect(() => {
@@ -1208,11 +1297,15 @@ const MapView = ({
 
             try {
                 map.current.flyTo(flyOptions);
+                bumpPerfCounter('map', 'flyToCount', {
+                    reason: 'external_flyTo',
+                    center: flyOptions.center
+                });
             } catch (e) {
                 console.error('[MapView] FlyTo error:', e);
             }
         }
-    }, [flyToLocation]);
+    }, [bumpPerfCounter, flyToLocation]);
 
     return (
         <div className="absolute inset-0 w-full h-full">
