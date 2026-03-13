@@ -43,30 +43,18 @@ export default function useMapUI(locations = null) {
   const [isStyleMenuOpen, setIsStyleMenuOpen] = useState(false);
   const [isMapToolsOpen, setIsMapToolsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [showHubs, setShowHubs] = useState(stored?.showHubs ?? true);
-  const [showSolos, setShowSolos] = useState(stored?.showSolos ?? true);
-  const [showDetections, setShowDetections] = useState(stored?.showDetections ?? true);
   const [flyToLocation, setFlyToLocation] = useState(null);
   const [searchInputValue, setSearchInputValue] = useState('');
   
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        mapStyle,
-        showHubs,
-        showSolos,
-        showDetections
+        mapStyle
       }));
     } catch (e) {
       console.warn('[useMapUI] Failed to save preferences:', e);
     }
-  }, [mapStyle, showHubs, showSolos, showDetections]);
-  
-  const mapFlags = useMemo(() => ({
-    showHubs,
-    showSolos,
-    showDetections
-  }), [showHubs, showSolos, showDetections]);
+  }, [mapStyle]);
 
   const handleSearch = useCallback((e) => {
     if (e.key === 'Enter') {
@@ -99,18 +87,6 @@ export default function useMapUI(locations = null) {
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => !prev);
-  }, []);
-
-  const toggleHubs = useCallback(() => {
-    setShowHubs(prev => !prev);
-  }, []);
-
-  const toggleSolos = useCallback(() => {
-    setShowSolos(prev => !prev);
-  }, []);
-
-  const toggleDetections = useCallback(() => {
-    setShowDetections(prev => !prev);
   }, []);
 
   const flyToCoordinates = useCallback((lng, lat, zoom, pitch, bearing) => {
@@ -162,12 +138,8 @@ export default function useMapUI(locations = null) {
     isStyleMenuOpen,
     isMapToolsOpen,
     isFullScreen,
-    showHubs,
-    showSolos,
-    showDetections,
     flyToLocation,
     searchInputValue,
-    mapFlags,
     MAP_STYLES,
     MAP_CONFIG,
 
@@ -178,9 +150,6 @@ export default function useMapUI(locations = null) {
     toggleStyleMenu,
     toggleMapTools,
     toggleFullScreen,
-    toggleHubs,
-    toggleSolos,
-    toggleDetections,
     flyToCoordinates,
     flyToDevice,
     flyToDetection,

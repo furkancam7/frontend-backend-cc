@@ -460,7 +460,7 @@ export default function DeviceHealthPanel({
       <SectionCard
         eyebrow="Live Health"
         title="Connection Signals"
-        description="Current reachability and service readiness for the active device."
+        description="Jetson device connection statuses — MQTT, Tailscale, Reverse Tunnel and SSH."
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <StatusMetric label="MQTT" value={detail?.mqtt_ok ?? selectedDevice?.mqtt_ok} />
@@ -497,7 +497,7 @@ export default function DeviceHealthPanel({
       <SectionCard
         eyebrow="Access Health"
         title="Current Access Checks"
-        description="Latest access-state booleans from MQTT, Tailscale, reverse tunnel, and SSH."
+        description="Access status from Jetson device — MQTT, Tailscale, Reverse Tunnel and SSH."
       >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <StatusMetric label="MQTT" value={accessState.mqtt_ok ?? detail?.mqtt_ok} />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo, useRef } from 'react';
 import useTransferUpdates from '../hooks/useTransferUpdates';
+import { usePreferences } from '../context/PreferencesContext';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
 const FALLBACK_THUMBNAIL_URL = 'https://placehold.co/100x100/000000/FFF?text=No+Img';
@@ -30,23 +31,23 @@ const TransferProgressBar = memo(({ percent, label, subLabel }) => (
     </div>
 ));
 
-const TransferProgressBanner = memo(({ transfers }) => {
+const TransferProgressBanner = memo(({ transfers, t }) => {
     if (!transfers || transfers.length === 0) return null;
 
     return (
         <div className="bg-gradient-to-r from-cyan-900/30 to-blue-900/30 border-b border-cyan-500/30 p-3">
             <div className="text-xs text-cyan-400 font-semibold mb-2 flex items-center gap-2">
                 <span className="animate-pulse text-lg">●</span>
-                ACTIVE TRANSFER {transfers.length > 1 ? `(${transfers.length})` : ''}
+                {t('detectionList.activeTransfer')} {transfers.length > 1 ? `(${transfers.length})` : ''}
             </div>
-            {transfers.map(t => (
-                <div key={t.transfer_id} className="mb-2 last:mb-0">
+            {transfers.map(transfer => (
+                <div key={transfer.transfer_id} className="mb-2 last:mb-0">
                     <div className="flex justify-between text-xs mb-1">
-                        <span className="text-gray-300 truncate max-w-[150px]">{t.filename}</span>
+                        <span className="text-gray-300 truncate max-w-[150px]">{transfer.filename}</span>
                     </div>
                     <TransferProgressBar
-                        percent={t.percent}
-                        subLabel={`${t.chunks_received.toLocaleString()} / ${t.chunks_total.toLocaleString()} chunks`}
+                        percent={transfer.percent}
+                        subLabel={`${transfer.chunks_received.toLocaleString()} / ${transfer.chunks_total.toLocaleString()} ${t('detectionList.chunks')}`}
                     />
                 </div>
             ))}
@@ -59,7 +60,7 @@ const getMapboxStaticUrl = (lat, lon) => {
     return `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/static/${lon},${lat},15,0/120x80@2x?access_token=${MAPBOX_TOKEN}&attribution=false&logo=false`;
 };
 
-const DetectionMiniMap = memo(({ latitude, longitude }) => {
+const DetectionMiniMap = memo(({ latitude, longitude, t }) => {
     if (!latitude || !longitude) return null;
 
     const staticMapUrl = getMapboxStaticUrl(latitude, longitude);
@@ -74,7 +75,7 @@ const DetectionMiniMap = memo(({ latitude, longitude }) => {
             {!imgError ? (
                 <img
                     src={staticMapUrl}
-                    alt="Location"
+                    alt={t('dataTable.location')}
                     className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
                     loading="lazy"
                     onError={() => setImgError(true)}
@@ -96,7 +97,7 @@ const DetectionMiniMap = memo(({ latitude, longitude }) => {
     );
 });
 
-const DetectionThumbnail = memo(({ src, crop, onOpenDetail, onViewContext }) => {
+const DetectionThumbnail = memo(({ src, crop, onOpenDetail, onViewContext, t }) => {
     const [imgError, setImgError] = useState(false);
 
     useEffect(() => {
@@ -124,7 +125,7 @@ const DetectionThumbnail = memo(({ src, crop, onOpenDetail, onViewContext }) => 
             <button
                 onClick={(e) => { e.stopPropagation(); onViewContext(crop); }}
                 className="absolute bottom-0.5 right-0.5 w-5 h-5 bg-black/80 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-cyan-600"
-                title="View Context"
+                title={t('detectionList.viewContext')}
             >
                 <svg className="w-3 h-3 text-cyan-400 hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
             </button>
@@ -143,7 +144,9 @@ const DetectionItem = memo(({
     onEditStart,
     onSave,
     onCancelEdit,
-    onDelete
+    onDelete,
+    t,
+    locale
 }) => {
     const [localForm, setLocalForm] = useState({
         class: crop.class || '',
@@ -216,6 +219,7 @@ const DetectionItem = memo(({
                     crop={crop}
                     onOpenDetail={onOpenDetail}
                     onViewContext={onViewContext}
+                    t={t}
                 />
 
                 { }
@@ -228,7 +232,7 @@ const DetectionItem = memo(({
                                     value={localForm.class}
                                     onChange={e => setLocalForm(prev => ({ ...prev, class: e.target.value }))}
                                     className="flex-[2] bg-black border border-gray-700 rounded px-1 text-[10px] h-6 text-white focus:border-cyan-500 outline-none"
-                                    placeholder="Class"
+                                    placeholder={t('detectionList.classPlaceholder')}
                                     autoFocus
                                 />
                                 <input
@@ -244,11 +248,11 @@ const DetectionItem = memo(({
                                 value={localForm.device_id}
                                 onChange={e => setLocalForm(prev => ({ ...prev, device_id: e.target.value }))}
                                 className="w-full bg-black border border-gray-700 rounded px-1 text-[10px] h-6 text-white focus:border-cyan-500 outline-none"
-                                placeholder="Device ID"
+                                placeholder={t('detectionList.deviceIdPlaceholder')}
                             />
                             <div className="flex gap-1 mt-auto">
-                                <button onClick={handleSaveClick} className="flex-1 bg-green-900/30 text-green-500 hover:text-green-400 text-[9px] h-5 rounded flex items-center justify-center font-bold tracking-wider">SAVE</button>
-                                <button onClick={handleCancelClick} className="flex-1 bg-red-900/30 text-red-500 hover:text-red-400 text-[9px] h-5 rounded flex items-center justify-center font-bold tracking-wider">CANCEL</button>
+                                <button onClick={handleSaveClick} className="flex-1 bg-green-900/30 text-green-500 hover:text-green-400 text-[9px] h-5 rounded flex items-center justify-center font-bold tracking-wider">{t('detectionList.save')}</button>
+                                <button onClick={handleCancelClick} className="flex-1 bg-red-900/30 text-red-500 hover:text-red-400 text-[9px] h-5 rounded flex items-center justify-center font-bold tracking-wider">{t('detectionList.cancel')}</button>
                             </div>
                         </div>
                     ) : (
@@ -257,16 +261,16 @@ const DetectionItem = memo(({
                                 <div>
                                     {isReceiving && (
                                         <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 mb-1 inline-block animate-pulse">
-                                            RECEIVING
+                                            {t('detectionList.receiving')}
                                         </span>
                                     )}
                                     {isPartial && (
                                         <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-yellow-500/20 text-yellow-500 border border-yellow-500/30 mb-1 inline-block">
-                                            PARTIAL
+                                            {t('detectionList.partial')}
                                         </span>
                                     )}
                                     <h3 className="text-sm font-bold text-gray-200 group-hover:text-cyan-400 truncate capitalize transition-colors">{crop.class}</h3>
-                                    <p className="text-[10px] text-gray-500 font-mono truncate">Device: {crop.device_id}</p>
+                                    <p className="text-[10px] text-gray-500 font-mono truncate">{t('detectionList.deviceLabel')}: {crop.device_id}</p>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
                                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-black text-white border-gray-700">
@@ -277,14 +281,14 @@ const DetectionItem = memo(({
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onEditStart(crop); }}
                                                 className="text-cyan-500 hover:text-cyan-400 hover:bg-cyan-900/20 p-1 rounded transition-colors"
-                                                title="Edit"
+                                                title={t('detectionList.edit')}
                                             >
                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                             </button>
                                             <button
                                                 onClick={(e) => { e.stopPropagation(); onDelete(crop); }}
                                                 className="text-red-500 hover:text-red-400 hover:bg-red-900/20 p-1 rounded transition-colors"
-                                                title="Delete"
+                                                title={t('detectionList.delete')}
                                             >
                                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                             </button>
@@ -300,13 +304,13 @@ const DetectionItem = memo(({
                                         <span className="font-mono text-gray-400">
                                             {crop.location && typeof crop.location.latitude === 'number'
                                                 ? `${crop.location.latitude.toFixed(4)}, ${crop.location.longitude.toFixed(4)}`
-                                                : <span className="text-gray-600 italic">No Signal</span>
+                                                : <span className="text-gray-600 italic">{t('detectionList.noSignal')}</span>
                                             }
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1 text-[10px] text-gray-600">
                                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                                        <span>{new Date(crop.captured_time).toLocaleTimeString()}</span>
+                                        <span>{new Date(crop.captured_time).toLocaleTimeString(locale)}</span>
                                     </div>
                                 </div>
                                 {crop.location?.latitude && (
@@ -316,12 +320,13 @@ const DetectionItem = memo(({
                                         className="w-16 h-10 rounded overflow-hidden border border-gray-700 hover:border-cyan-500 cursor-pointer transition-colors focus:outline-none focus:ring-1 focus:ring-cyan-500 shadow-sm"
                                         onClick={handleMapClick}
                                         onKeyDown={handleMapKeyDown}
-                                        title="Click to view on map"
-                                        aria-label={`View detection at ${crop.location.latitude}, ${crop.location.longitude} on map`}
+                                        title={t('detectionList.clickToViewOnMap')}
+                                        aria-label={t('detectionList.viewDetectionOnMap', { lat: crop.location.latitude, lng: crop.location.longitude })}
                                     >
                                         <DetectionMiniMap
                                             latitude={crop.location.latitude}
                                             longitude={crop.location.longitude}
+                                            t={t}
                                         />
                                     </div>
                                 )}
@@ -333,7 +338,7 @@ const DetectionItem = memo(({
                                         percent={activeTransfer.percent}
                                         label={
                                             <>
-                                                <span className="animate-pulse">●</span> Receiving...
+                                                <span className="animate-pulse">●</span> {t('detectionList.receivingProgress')}
                                             </>
                                         }
                                     />
@@ -356,6 +361,7 @@ function DetectionList({
     isAdmin,
     isActive = true
 }) {
+    const { t, locale } = usePreferences();
     const [filter, setFilter] = useState('');
     const [editingId, setEditingId] = useState(null);
     const ITEM_HEIGHT = 106;
@@ -429,7 +435,7 @@ function DetectionList({
     }, [onUpdate]);
 
     const handleDelete = useCallback(async (crop) => {
-        if (window.confirm(`Are you sure you want to delete this detection (${crop.class})?`)) {
+        if (window.confirm(t('detectionList.deleteConfirm', { className: crop.class }))) {
             try {
                 await fetch(`/api/crop/${crop.crop_id}`, {
                     method: 'DELETE',
@@ -437,10 +443,10 @@ function DetectionList({
                 });
             } catch (err) {
                 console.error('Failed to delete detection:', err);
-                alert('Failed to delete detection');
+                alert(t('detectionList.deleteFailed'));
             }
         }
-    }, []);
+    }, [t]);
 
     const handleCancelEdit = useCallback(() => setEditingId(null), []);
     const activeTransfersByRecordId = useMemo(() => {
@@ -473,15 +479,14 @@ function DetectionList({
 
     return (
         <div className="h-full flex flex-col bg-black">
-            <TransferProgressBanner transfers={activeTransfers} />
+            <TransferProgressBanner transfers={activeTransfers} t={t} />
 
             {/* Header */}
             <div className="p-4 border-b border-gray-900 flex flex-col gap-3 bg-black sticky top-0 z-10">
                 <div className="flex justify-between items-center">
                     <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
                         <span className="w-1.5 h-1.5 bg-cyan-500 rounded-full"></span>
-                        Active
-                        <span className="text-gray-600 font-mono">[{filteredDetections.length}]</span>
+                        <span className="text-cyan-400 font-mono">{filteredDetections.length}</span> {t('detectionList.detections')}
                     </h2>
                 </div>
 
@@ -489,7 +494,7 @@ function DetectionList({
                 <div className="relative">
                     <input
                         type="text"
-                        placeholder="Filter detections..."
+                        placeholder={t('detectionList.filterPlaceholder')}
                         value={filter}
                         onChange={(e) => setFilter(e.target.value)}
                         className="w-full bg-gray-950 border border-gray-900 rounded-lg px-3 py-2 text-xs text-gray-300 focus:border-gray-700 focus:outline-none transition-colors placeholder-gray-700"
@@ -528,6 +533,8 @@ function DetectionList({
                                     onSave={handleSave}
                                     onCancelEdit={handleCancelEdit}
                                     onDelete={handleDelete}
+                                    t={t}
+                                    locale={locale}
                                 />
                             </div>
                         );
@@ -536,7 +543,7 @@ function DetectionList({
 
                 {filteredDetections.length === 0 && (
                     <div className="text-center py-10 text-gray-600 text-xs absolute top-0 w-full">
-                        No detections found
+                        {t('detectionList.noDetectionsFound')}
                     </div>
                 )}
             </div>

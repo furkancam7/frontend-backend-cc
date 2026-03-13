@@ -139,4 +139,13 @@ VALUES (
     TRUE
 ) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
+INSERT INTO users (username, email, password_hash, role, is_active)
+VALUES (
+    'user',
+    'user@commandcenter.local',
+    '$2b$12$tFHMjI.QdOYq1uylrcLFC.duBjB2aJNUGfjW0yOMKYzphY30Hcul.',
+    'viewer',
+    TRUE
+) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+
 COMMIT;

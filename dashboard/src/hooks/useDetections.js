@@ -31,11 +31,26 @@ const hashCode = (str) => {
   return hash.toString(36);
 };
 
+const getDetectionSignature = (detection) => [
+  detection?.crop_id ?? '',
+  detection?.record_id ?? '',
+  detection?.class ?? '',
+  detection?.accuracy ?? '',
+  detection?.device_id ?? '',
+  detection?.location?.latitude ?? '',
+  detection?.location?.longitude ?? '',
+  detection?.captured_time ?? detection?.detection_time ?? '',
+  detection?.raw?.updated_at ?? '',
+  detection?.raw?.image_status ?? detection?.image_status ?? ''
+].join(':');
+
 const getDetectionsFingerprint = (detections) => {
   if (!detections || detections.length === 0) return '0::';
-  const ids = detections.map(d => d.crop_id).sort().join(',');
-  const timestamps = detections.map(d => d.raw?.updated_at || d.raw?.image_status || '').join(',');
-  return `${detections.length}:${hashCode(ids)}:${hashCode(timestamps)}`;
+  const signature = detections
+    .map(getDetectionSignature)
+    .sort()
+    .join('|');
+  return `${detections.length}:${hashCode(signature)}`;
 };
 
 const loadCachedDetections = () => {

@@ -4,6 +4,19 @@ import api from '../services/api';
 const POLLING_INTERVAL = 5000;
 const DEFAULT_OFFLINE_THRESHOLD_S = 90;
 
+const getDeviceFingerprint = (d) => [
+  d.id, d.status, d.online, d.lastSeen || '', d.lastHeartbeatAt || '',
+  d.location?.latitude || '', d.location?.longitude || '',
+  d.mqtt_ok, d.tailscale_ok, d.reverse_tunnel_ok, d.ssh_ready,
+  d.primary_interface || '', d.public_egress_ip || '', d.local_ip || '', d.tailscale_ip || '',
+  d.current_config_version || '',
+].join(':');
+
+const getDevicesFingerprint = (devices) => {
+  if (!devices || devices.length === 0) return '';
+  return devices.map(getDeviceFingerprint).sort().join('|');
+};
+
 const parseIsoDate = (value) => {
   if (!value) return null;
 
@@ -101,7 +114,12 @@ export default function useDevices(token, onUnauthorized) {
             });
 
           mappedDevices.sort((a, b) => a.name.localeCompare(b.name));
-          setDevices(mappedDevices);
+          setDevices(prev => {
+            const prevFp = getDevicesFingerprint(prev);
+            const nextFp = getDevicesFingerprint(mappedDevices);
+            if (prevFp === nextFp) return prev;
+            return mappedDevices;
+          });
         }
       } catch (err) {
         if (cancelled) return;

@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "Bash(python:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(node -e:*)",
+      "Bash(npx:*)",
+      "Bash(npx -y -p bcryptjs node -e \"const b = require\\(''bcryptjs''\\); b.hash\\(''user123'', 12\\).then\\(h => console.log\\(h\\)\\)\")",
+      "Bash(npm run build:*)",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(PGPASSWORD=TurkAI2026_db psql:*)",
+      "Bash(dpkg:*)",
+      "Bash(docker exec:*)",
+      "Bash(wc:*)"
     ]
   }
 }

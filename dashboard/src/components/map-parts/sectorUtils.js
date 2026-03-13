@@ -102,10 +102,6 @@ export const createSoloZonesGeoJSON = (devices, zoneType, allConfigs = null) => 
       var defaultHeading = allConfigs?.defaultHeading ?? 0;
     }
     
-    if (deviceZoneConfig.enabled === false) {
-      return; 
-    }
-    
     const direction = device.direction ?? device.raw?.direction ?? defaultHeading;
     const center = [device.location.longitude, device.location.latitude];
     const feature = createSectorFeature(

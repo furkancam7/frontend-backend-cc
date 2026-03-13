@@ -44,6 +44,15 @@ class MockDatabase:
                 'role': 'admin',
                 'is_active': True,
                 'created_at': datetime.now(timezone.utc).isoformat()
+            },
+            'user': {
+                'id': 'user-001',
+                'username': 'user',
+                'email': 'user@localhost',
+                'password_hash': '$2b$12$tFHMjI.QdOYq1uylrcLFC.duBjB2aJNUGfjW0yOMKYzphY30Hcul.',  # "user123"
+                'role': 'viewer',
+                'is_active': True,
+                'created_at': datetime.now(timezone.utc).isoformat()
             }
         }
         logger.info("Mock Database initialized for local testing")
@@ -484,10 +493,10 @@ class DatabaseManager:
                     pass
     
     def get_user_by_username(self, username: str) -> Optional[Dict]:
-        # Mock mode - return mock admin user
+        # Mock mode - return mock users
         if self.use_mock:
-            if username == 'admin':
-                return {
+            mock_users = {
+                'admin': {
                     "id": 1,
                     "username": "admin",
                     "email": "admin@localhost",
@@ -497,8 +506,20 @@ class DatabaseManager:
                     "last_login": None,
                     "created_at": datetime.now(timezone.utc).isoformat(),
                     "updated_at": None
+                },
+                'user': {
+                    "id": 2,
+                    "username": "user",
+                    "email": "user@localhost",
+                    "hashed_password": "$2b$12$tFHMjI.QdOYq1uylrcLFC.duBjB2aJNUGfjW0yOMKYzphY30Hcul.",  # "user123"
+                    "role": "viewer",
+                    "is_active": True,
+                    "last_login": None,
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "updated_at": None
                 }
-            return None
+            }
+            return mock_users.get(username)
             
         result = self._execute(
             """SELECT id, username, email, password_hash, role, is_active, 
@@ -524,9 +545,9 @@ class DatabaseManager:
     def get_user_by_id(self, user_id: int) -> Optional[Dict]:
         # Mock mode
         if self.use_mock:
-            if user_id == 1:
-                return self.get_user_by_username('admin')
-            return None
+            id_to_username = {1: 'admin', 2: 'user'}
+            uname = id_to_username.get(user_id)
+            return self.get_user_by_username(uname) if uname else None
             
         result = self._execute(
             """SELECT id, username, email, password_hash, role, is_active, 

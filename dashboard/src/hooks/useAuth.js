@@ -1,38 +1,45 @@
 import { useState, useCallback } from 'react';
+import { setToken as setApiToken } from '../services/api';
 
-const clearAuthData = () => {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+const parseStoredUser = () => {
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return null;
+  try {
+    return JSON.parse(userStr);
+  } catch (e) {
+    console.error('Failed to parse user data:', e);
+    return null;
+  }
 };
 
 export default function useAuth() {
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [userRole, setUserRole] = useState(() => {
-    const userStr = localStorage.getItem('user');
-    try {
-      return userStr ? JSON.parse(userStr).role : null;
-    } catch (e) {
-      console.error('Failed to parse user data:', e);
-      return null;
-    }
-  });
+  const [currentUser, setCurrentUser] = useState(() => parseStoredUser());
+  const userRole = currentUser?.role || null;
+
+  const setUserRole = useCallback((role) => {
+    setCurrentUser(prev => ({ ...(prev || {}), role }));
+  }, []);
 
   const isUserAdmin = userRole === 'admin';
+
   const handleLogout = useCallback(() => {
-    clearAuthData();
-    setToken(null);
-    setUserRole(null);
+    setApiToken(null);
+    setCurrentUser(null);
+    window.location.reload();
   }, []);
 
   const handleUnauthorized = useCallback(() => {
-    clearAuthData();
+    setApiToken(null);
     setToken(null);
-    setUserRole(null);
+    setCurrentUser(null);
   }, []);
 
   return {
     token,
     setToken,
+    currentUser,
+    setCurrentUser,
     userRole,
     setUserRole,
     isUserAdmin,

@@ -1,7 +1,34 @@
 import React, { useState } from 'react';
 import { login, setToken as setApiToken } from '../services/api';
+import { usePreferences } from '../context/PreferencesContext';
 
-const Login = ({ setToken, setUserRole }) => {
+const PreferenceControls = ({ language, onLanguageChange, theme, onThemeToggle, t }) => (
+  <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+    <label className="sr-only" htmlFor="login-language-select">{t('common.language')}</label>
+    <select
+      id="login-language-select"
+      value={language}
+      onChange={(e) => onLanguageChange(e.target.value)}
+      className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] px-2 text-[11px] text-[var(--text-main)] focus:outline-none"
+      title={t('common.language')}
+    >
+      <option value="en">EN</option>
+      <option value="tr">TR</option>
+      <option value="sr">SR</option>
+    </select>
+    <button
+      type="button"
+      onClick={onThemeToggle}
+      className="h-8 rounded-md border border-[var(--border-color)] bg-[var(--bg-panel)] px-2 text-[11px] uppercase text-[var(--text-main)]"
+      title={`${t('common.theme')}: ${theme === 'dark' ? t('common.dark') : t('common.light')}`}
+    >
+      {theme === 'dark' ? t('common.dark') : t('common.light')}
+    </button>
+  </div>
+);
+
+const Login = ({ setToken, setUserRole, setCurrentUser }) => {
+  const { language, setLanguage, theme, setTheme, t } = usePreferences();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,12 +45,13 @@ const Login = ({ setToken, setUserRole }) => {
         setApiToken(data.access_token);
         localStorage.setItem('user', JSON.stringify(data.user));
         setToken(data.access_token);
+        if (setCurrentUser) setCurrentUser(data.user);
         if (setUserRole) setUserRole(data.user.role);
       } else {
-        setError(data.message || 'Authentication failed');
+        setError(data.message || t('login.authFailed'));
       }
     } catch (err) {
-      setError('Connection error. Please try again.');
+      setError(t('login.connectionError'));
       console.error(err);
     } finally {
       setIsLoading(false);
@@ -31,7 +59,14 @@ const Login = ({ setToken, setUserRole }) => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-[#050505] text-gray-300 relative overflow-hidden font-sans selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="flex items-center justify-center min-h-screen bg-[var(--bg-app)] text-[var(--text-main)] relative overflow-hidden font-sans selection:bg-[var(--selection-bg)] selection:text-[var(--selection-text)]">
+      <PreferenceControls
+        language={language}
+        onLanguageChange={setLanguage}
+        theme={theme}
+        onThemeToggle={() => setTheme(prev => (prev === 'dark' ? 'light' : 'dark'))}
+        t={t}
+      />
 
       { }
       <div className="absolute inset-0 z-0">
@@ -44,16 +79,21 @@ const Login = ({ setToken, setUserRole }) => {
         { }
         <div className="absolute inset-0 bg-gradient-to-b from-gray-800 to-gray-900 rounded-2xl blur-[1px] opacity-50"></div>
 
-        <div className="relative bg-[#0a0a0a] rounded-2xl border border-gray-800/50 shadow-2xl shadow-black/50 p-8 md:p-10 backdrop-blur-xl">
+        <div className="relative bg-[var(--bg-panel)] rounded-2xl border border-[var(--border-color)] shadow-2xl shadow-black/50 p-8 md:p-10 backdrop-blur-xl">
 
           { }
           <div className="flex flex-col items-center mb-10 space-y-4">
-            <div className="w-32 h-32 bg-black/50 rounded-2xl flex items-center justify-center border border-gray-800 shadow-inner mb-4 group">
-              <img src="/assets/roboteye.png?v=2" alt="Robot Eye" className="w-24 h-24 object-contain opacity-80 group-hover:opacity-100 transition-opacity duration-500" />
+            <div className="w-64 h-28 md:w-72 md:h-32 bg-gradient-to-br from-[#061318] via-black to-[#0a0a0a] rounded-3xl flex items-center justify-center border border-cyan-950/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.03),0_18px_40px_rgba(0,0,0,0.45)] mb-4 group relative overflow-hidden px-6">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(34,211,238,0.14),transparent_55%)] opacity-80" />
+              <img
+                src="/assets/stopfires.png?v=2"
+                alt="StopFires"
+                className="relative w-52 md:w-60 h-auto object-contain opacity-95 drop-shadow-[0_0_18px_rgba(34,211,238,0.16)] group-hover:scale-[1.03] transition-all duration-500"
+              />
             </div>
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white tracking-tight">Command Center</h2>
-              <p className="text-xs text-gray-500 uppercase tracking-[0.2em] mt-2 font-medium">Tactical Surveillance System</p>
+              <h2 className="text-2xl font-bold text-[var(--text-main)] tracking-tight">{t('login.title')}</h2>
+              <p className="text-xs text-[var(--text-muted)] uppercase tracking-[0.2em] mt-2 font-medium">{t('login.subtitle')}</p>
             </div>
           </div>
 
@@ -68,7 +108,7 @@ const Login = ({ setToken, setUserRole }) => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider ml-1">Operator ID</label>
+              <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider ml-1">{t('login.operatorId')}</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-5 w-5 text-gray-600 group-focus-within:text-cyan-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -79,15 +119,15 @@ const Login = ({ setToken, setUserRole }) => {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-[#050505] border border-gray-800 rounded-xl text-gray-200 placeholder-gray-700 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all duration-200 sm:text-sm"
-                  placeholder="Enter username"
+                  className="block w-full pl-10 pr-3 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all duration-200 sm:text-sm"
+                  placeholder={t('login.usernamePlaceholder')}
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider ml-1">Access Key</label>
+              <label className="block text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider ml-1">{t('login.accessKey')}</label>
               <div className="relative group">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <svg className="h-5 w-5 text-gray-600 group-focus-within:text-cyan-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -98,7 +138,7 @@ const Login = ({ setToken, setUserRole }) => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-3 bg-[#050505] border border-gray-800 rounded-xl text-gray-200 placeholder-gray-700 focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all duration-200 sm:text-sm"
+                  className="block w-full pl-10 pr-3 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-xl text-[var(--text-main)] placeholder-[var(--text-muted)] focus:outline-none focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/50 transition-all duration-200 sm:text-sm"
                   placeholder="••••••••"
                   required
                 />
@@ -116,16 +156,16 @@ const Login = ({ setToken, setUserRole }) => {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : (
-                <span className="relative z-10">Authenticate</span>
+                <span className="relative z-10">{t('login.authenticate')}</span>
               )}
               <div className="absolute inset-0 h-full w-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
             </button>
           </form>
 
-          <div className="mt-8 pt-6 border-t border-gray-800/50 text-center">
-            <p className="text-[10px] text-gray-600 font-mono">
-              SECURE CONNECTION ESTABLISHED<br />
-              <span className="text-green-900">ENCRYPTED :: AES-256</span>
+          <div className="mt-8 pt-6 border-t border-[var(--border-color)] text-center">
+            <p className="text-[10px] text-[var(--text-muted)] font-mono">
+              <br />{t('login.securityProtocol')}<br />
+              <span className="text-green-900"></span>
             </p>
           </div>
         </div>

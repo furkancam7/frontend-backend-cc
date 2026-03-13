@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import useTransferUpdates from '../hooks/useTransferUpdates';
+import { usePreferences } from '../context/PreferencesContext';
 
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWVyYXhlc2MiLCJhIjoiY21pOGo2Mm13MDU0cjJtcXYzOWoxcGxzdyJ9.wSG0vWOLa94To8P3lYMdxQ';
 
@@ -25,7 +26,7 @@ const apiReq = async (url, options = {}) => {
     return res.text(); 
 };
 
-const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, onViewOnMap }) => {
+const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, onViewOnMap, t }) => {
     const [imgError, setImgError] = useState(false);
     
     useEffect(() => {
@@ -49,7 +50,7 @@ const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, o
              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-cyan-900/30 to-black border border-cyan-500/30">
                 <div className="flex items-center gap-1 mb-1">
                     <span className="w-2 h-2 bg-cyan-400 rounded-full animate-ping"></span>
-                    <span className="text-[10px] font-bold text-cyan-400 animate-pulse">RECEIVING</span>
+                    <span className="text-[10px] font-bold text-cyan-400 animate-pulse">{t('dataTable.receiving')}</span>
                 </div>
                 {activeTransfer && (
                     <>
@@ -70,20 +71,20 @@ const FullImageCell = React.memo(({ row, activeTransfer, hasAnyActiveTransfer, o
         <div className="w-32 h-20 bg-black rounded overflow-hidden border border-gray-700 group relative">
             <img
                 src={imageUrl}
-                alt="Full Frame"
+                alt={t('dataTable.fullFrame')}
                 className="w-full h-full object-cover group-hover:scale-110 transition-transform cursor-pointer"
                 onClick={handleClick}
                 onError={() => setImgError(true)}
                 loading="lazy"
             />
              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center pointer-events-none transition-opacity">
-                <span className="text-xs text-white font-bold">LOCATE</span>
+                <span className="text-xs text-white font-bold">{t('dataTable.locate')}</span>
             </div>
         </div>
     );
 });
 
-const LocationCell = React.memo(({ location, row, onViewOnMap }) => {
+const LocationCell = React.memo(({ location, row, onViewOnMap, t }) => {
     const hasLocation = location && location.latitude && location.longitude;
     
     const mapUrl = useMemo(() => {
@@ -100,7 +101,7 @@ const LocationCell = React.memo(({ location, row, onViewOnMap }) => {
     if (!hasLocation) {
         return (
             <div className="w-32 h-20 bg-gray-900/50 rounded border border-gray-800 flex items-center justify-center text-gray-600 text-xs">
-                No Signal
+                {t('dataTable.noSignal')}
             </div>
         );
     }
@@ -109,7 +110,7 @@ const LocationCell = React.memo(({ location, row, onViewOnMap }) => {
         <div className="w-32 h-20 bg-black rounded overflow-hidden border border-gray-700 relative group">
             <img
                 src={mapUrl}
-                alt="Location"
+                alt={t('dataTable.location')}
                 className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity cursor-pointer"
                 onClick={handleClick}
                 loading="lazy"
@@ -190,7 +191,7 @@ const CropsCell = React.memo(({ crops, isAdmin, editingCropId, setEditingCropId,
     );
 });
 
-const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingRecordId, onUpdateRecord, onViewOnMap }) => {
+const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingRecordId, onUpdateRecord, onViewOnMap, t }) => {
     const [editVal, setEditVal] = useState(row.device_id || '');
     
     useEffect(() => {
@@ -225,7 +226,7 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
                 />
             ) : (
                 <div className="flex items-center gap-1">
-                    {row.device_id || 'UNK'}
+                    {row.device_id || t('dataTable.unknownDeviceShort')}
                     {isAdmin && (
                         <button
                             onClick={(e) => {
@@ -245,6 +246,7 @@ const DeviceIdCell = React.memo(({ row, isAdmin, editingRecordId, setEditingReco
 });
 
 function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefresh, isActive = true }) {
+    const { t, locale } = usePreferences();
     const [editingCropId, setEditingCropId] = useState(null);
     const [editingRecordId, setEditingRecordId] = useState(null);
     const { activeTransfers } = useTransferUpdates(isActive);
@@ -279,7 +281,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
 
     const handleDeleteRecord = useCallback(async (row, e) => {
         e.stopPropagation();
-        if (window.confirm(`Are you sure you want to delete this record and all ${row.crops.length} detections?`)) {
+        if (window.confirm(t('dataTable.deleteRecordConfirm', { count: row.crops.length }))) {
             try {
                 await Promise.all(row.crops.map(crop =>
                     apiReq(`/api/crop/${crop.crop_id}`, { method: 'DELETE' })
@@ -287,10 +289,10 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                 if (onRefresh) onRefresh();
             } catch (err) {
                 console.error('Delete failed:', err);
-                alert('Failed to delete record');
+                alert(t('dataTable.deleteRecordFailed'));
             }
         }
-    }, [onRefresh]);
+    }, [onRefresh, t]);
 
     const handleUpdateCrop = useCallback(async (cropId, newClass) => {
         try {
@@ -301,9 +303,9 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
             setEditingCropId(null);
             if (onRefresh) onRefresh();
         } catch (err) {
-            alert('Failed to update crop');
+            alert(t('dataTable.updateCropFailed'));
         }
-    }, [onRefresh]);
+    }, [onRefresh, t]);
 
     const handleUpdateRecord = useCallback(async (recordId, newDeviceId) => {
         try {
@@ -314,9 +316,9 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
             setEditingRecordId(null);
             if (onRefresh) onRefresh();
         } catch (err) {
-            alert('Failed to update record');
+            alert(t('dataTable.updateRecordFailed'));
         }
-    }, [onRefresh]);
+    }, [onRefresh, t]);
 
     return (
         <div className="h-full flex flex-col bg-black text-gray-300 font-sans animate-in fade-in duration-300">
@@ -324,14 +326,14 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
             <div className="p-4 border-b border-gray-900 bg-black flex justify-between items-center">
                 <h2 className="flex items-center gap-3">
                     <div className="w-1 h-6 bg-cyan-500 rounded-full"></div>
-                    <span className="text-sm font-bold text-white uppercase tracking-wider">Table Format</span>
-                    <span className="text-xs text-gray-600 font-mono bg-gray-950 px-2 py-1 rounded">({groupedData.length} Records)</span>
+                    <span className="text-sm font-bold text-white uppercase tracking-wider">{t('dataTable.tableFormat')}</span>
+                    <span className="text-xs text-gray-600 font-mono bg-gray-950 px-2 py-1 rounded">({groupedData.length} {t('dataTable.records')})</span>
                     {onRefresh && (
                         <button 
                             onClick={onRefresh}
                             className="ml-2 px-3 py-1.5 text-xs bg-gray-950 hover:bg-gray-900 rounded-lg text-gray-500 hover:text-white border border-gray-900 hover:border-gray-800 transition-all"
                         >
-                            ↻ Refresh
+                            ↻ {t('dataTable.refresh')}
                         </button>
                     )}
                 </h2>
@@ -342,12 +344,12 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                 <table className="w-full border-collapse text-sm">
                     <thead>
                         <tr className="bg-gray-950 text-gray-500 border-b border-gray-900">
-                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">Full Frame</th>
-                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">Location</th>
-                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">Detected Objects</th>
-                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">Device ID</th>
-                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">Captured Time</th>
-                            <th className="p-3 text-center text-[10px] font-bold uppercase tracking-wider">Details</th>
+                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.fullFrame')}</th>
+                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.location')}</th>
+                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.detectedObjects')}</th>
+                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.deviceId')}</th>
+                            <th className="p-3 text-left text-[10px] font-bold uppercase tracking-wider">{t('dataTable.capturedTime')}</th>
+                            <th className="p-3 text-center text-[10px] font-bold uppercase tracking-wider">{t('dataTable.details')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -363,6 +365,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                             activeTransfer={activeTransfer} 
                                             hasAnyActiveTransfer={hasAnyActiveTransfer}
                                             onViewOnMap={onViewOnMap}
+                                            t={t}
                                         />
                                     </td>
 
@@ -372,6 +375,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                             location={row.location} 
                                             row={row}
                                             onViewOnMap={onViewOnMap}
+                                            t={t}
                                         />
                                     </td>
 
@@ -395,12 +399,13 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                             setEditingRecordId={setEditingRecordId}
                                             onUpdateRecord={handleUpdateRecord}
                                             onViewOnMap={onViewOnMap}
+                                            t={t}
                                         />
                                     </td>
 
                                     {}
                                     <td className="p-3 font-mono text-gray-400">
-                                        {row.captured_time ? new Date(row.captured_time).toLocaleString() : 'N/A'}
+                                        {row.captured_time ? new Date(row.captured_time).toLocaleString(locale) : t('dataTable.notAvailable')}
                                     </td>
 
                                     {}
@@ -409,7 +414,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                             <button
                                                 onClick={() => onOpenDetail && onOpenDetail(row.record_id)}
                                                 className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-gray-400 hover:bg-cyan-900 hover:text-cyan-400"
-                                                title="View Details"
+                                                title={t('dataTable.viewDetails')}
                                             >
                                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -420,7 +425,7 @@ function DataTable({ detections = [], onOpenDetail, onViewOnMap, isAdmin, onRefr
                                                 <button
                                                     onClick={(e) => handleDeleteRecord(row, e)}
                                                     className="w-8 h-8 rounded-full flex items-center justify-center transition-colors bg-gray-800 text-red-500 hover:bg-red-900/50 hover:text-red-400"
-                                                    title="Delete Record"
+                                                    title={t('dataTable.deleteRecord')}
                                                 >
                                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />

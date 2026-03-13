@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { HQ } from '../constants';
+import { usePreferences } from '../context/PreferencesContext';
 
 const FireIcon = () => (
     <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -95,13 +96,13 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
     return R * c;
 };
 
-const formatDistance = (distance) => {
-    if (distance === null) return 'Unknown';
+const formatDistance = (distance, unknownText) => {
+    if (distance === null) return unknownText;
     if (distance < 1) return `${Math.round(distance * 1000)}m`;
     return `${distance.toFixed(1)}km`;
 };
 
-const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex = 1 }) => {
+const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex = 1, t }) => {
     const [isExiting, setIsExiting] = useState(false);
     const category = getCategory(notification.class);
     const isFireCategory = category.key === 'fire' || category.key === 'smoke';
@@ -158,10 +159,10 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
             <div className="p-2 sm:p-3">
                 {}
                 <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-gray-300 text-[10px] sm:text-xs font-bold tracking-wider pl-1 truncate">{notification.device_id || 'Unknown Device'}</span>
+                    <span className="text-gray-300 text-[10px] sm:text-xs font-bold tracking-wider pl-1 truncate">{notification.device_id || t('notifications.unknownDevice')}</span>
                     {isFireCategory && (
                         <span className="px-1 py-0.5 bg-red-600/80 text-white text-[7px] sm:text-[8px] font-bold rounded tracking-wider animate-pulse flex-shrink-0">
-                            CRITICAL
+                            {t('notifications.critical')}
                         </span>
                     )}
                 </div>
@@ -174,7 +175,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
                             <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg overflow-hidden border border-gray-600 bg-gray-800">
                                 <img
                                     src={notification.image_path.startsWith('http') ? notification.image_path : `/api${notification.image_path}`}
-                                    alt="Crop"
+                                    alt={t('notifications.cropAlt')}
                                     className="w-full h-full object-cover"
                                 />
                             </div>
@@ -196,7 +197,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
                     <div className="flex-1 min-w-0 pt-0.5">
                         {}
                         <div className="text-white font-bold text-[11px] sm:text-sm mb-0.5 uppercase tracking-wide truncate">
-                            {notification.class} DETECTED
+                            {notification.class} {t('notifications.detected')}
                         </div>
 
                         {}
@@ -205,7 +206,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
-                            {formatDistance(distance)} away
+                            {formatDistance(distance, t('notifications.unknown'))} {t('notifications.away')}
                         </div>
 
                         {}
@@ -223,7 +224,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
                             handleDismiss();
                         }}
                         className="p-1 rounded text-gray-500 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0"
-                        aria-label="Dismiss notification"
+                        aria-label={t('notifications.dismiss')}
                     >
                         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
@@ -236,6 +237,7 @@ const NotificationItem = React.memo(({ notification, onDismiss, onClick, zIndex 
 });
 
 const DetectionNotification = ({ notifications, onDismiss, onClick }) => {
+    const { t } = usePreferences();
     const displayNotifications = useMemo(() => {
         const LIMIT = 50;
         const count = notifications.length;
@@ -253,6 +255,7 @@ const DetectionNotification = ({ notifications, onDismiss, onClick }) => {
                         notification={notification}
                         onDismiss={onDismiss}
                         onClick={onClick}
+                        t={t}
                         zIndex={displayNotifications.length - index}
                     />
                 ))}

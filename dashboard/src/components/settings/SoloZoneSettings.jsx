@@ -6,17 +6,32 @@ const DEFAULT_ZONE_CONFIG = {
   sensor: {
     angle: 120,
     radius: 30,
-    color: '#22c55e',
-    enabled: true
+    color: '#22c55e'
   },
   detection: {
     angle: 70,
     radius: 120,
-    color: '#3b82f6',
-    enabled: true
+    color: '#3b82f6'
   },
   defaultHeading: 0
 };
+
+const normalizeZone = (zoneConfig, defaults) => {
+  const { enabled, ...rest } = zoneConfig || {};
+  return { ...defaults, ...rest };
+};
+
+const normalizeDeviceConfig = (deviceConfig = {}) => ({
+  sensor: normalizeZone(deviceConfig.sensor, DEFAULT_ZONE_CONFIG.sensor),
+  detection: normalizeZone(deviceConfig.detection, DEFAULT_ZONE_CONFIG.detection),
+  defaultHeading: Number.isFinite(deviceConfig.defaultHeading)
+    ? deviceConfig.defaultHeading
+    : DEFAULT_ZONE_CONFIG.defaultHeading
+});
+
+const normalizeAllConfigs = (configs = {}) => Object.fromEntries(
+  Object.entries(configs).map(([deviceId, deviceConfig]) => [deviceId, normalizeDeviceConfig(deviceConfig)])
+);
 
 const TacticalCompass = ({ value, onChange, disabled }) => {
   const handleMouseDown = useCallback((e) => {
@@ -191,37 +206,25 @@ const ParamRow = ({ label, value, onChange, min, max, step = 1, unit, color, dis
 );
 
 const ZonePanel = ({ title, config, onChange, disabled }) => {
-  const isEnabled = config.enabled;
-  
   return (
-    <div className={`border transition-all ${isEnabled ? 'border-gray-800 bg-black/40' : 'border-gray-900 bg-black/20'}`}>
+    <div className="border border-gray-800 bg-black/40 transition-all">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-900">
         <div className="flex items-center gap-2">
           <div 
             className="w-2 h-2 rounded-full transition-all"
             style={{ 
-              backgroundColor: isEnabled ? config.color : '#374151',
-              boxShadow: isEnabled ? `0 0 8px ${config.color}` : 'none'
+              backgroundColor: config.color,
+              boxShadow: `0 0 8px ${config.color}`
             }}
           />
           <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">{title}</span>
         </div>
-        <button
-          onClick={() => onChange({ ...config, enabled: !isEnabled })}
-          disabled={disabled}
-          className={`text-[10px] px-2 py-0.5 rounded font-medium uppercase tracking-wider transition-all ${
-            isEnabled 
-              ? 'bg-gray-800 text-green-400 hover:bg-gray-700' 
-              : 'bg-gray-900 text-gray-600 hover:bg-gray-800 hover:text-gray-400'
-          }`}
-        >
-          {isEnabled ? 'ON' : 'OFF'}
-        </button>
+        <span className="text-[10px] text-gray-600 uppercase tracking-wider">Always Visible</span>
       </div>
       
       {/* Parameters */}
-      <div className={`px-3 py-1 transition-all ${isEnabled ? 'opacity-100' : 'opacity-30 pointer-events-none'}`}>
+      <div className="px-3 py-1 transition-all">
         <ParamRow
           label="FOV"
           value={config.angle}
@@ -230,7 +233,7 @@ const ZonePanel = ({ title, config, onChange, disabled }) => {
           max={360}
           unit="°"
           color={config.color}
-          disabled={disabled || !isEnabled}
+          disabled={disabled}
         />
         <ParamRow
           label="Range"
@@ -241,7 +244,7 @@ const ZonePanel = ({ title, config, onChange, disabled }) => {
           step={5}
           unit="m"
           color={config.color}
-          disabled={disabled || !isEnabled}
+          disabled={disabled}
         />
         <div className="flex items-center justify-between py-2">
           <span className="text-xs text-gray-500 uppercase tracking-wider">Color</span>
@@ -250,7 +253,7 @@ const ZonePanel = ({ title, config, onChange, disabled }) => {
               type="color"
               value={config.color}
               onChange={(e) => onChange({ ...config, color: e.target.value })}
-              disabled={disabled || !isEnabled}
+              disabled={disabled}
               className="w-6 h-6 rounded border-0 bg-transparent cursor-pointer disabled:opacity-30"
             />
             <span className="font-mono text-xs text-gray-500">{config.color}</span>
@@ -282,7 +285,7 @@ export default function SoloZoneSettings({ onConfigChange, onClose, devices = []
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        return JSON.parse(stored);
+        return normalizeAllConfigs(JSON.parse(stored));
       }
     } catch (e) {
       console.warn('Failed to load stored configs:', e);
@@ -291,13 +294,14 @@ export default function SoloZoneSettings({ onConfigChange, onClose, devices = []
   });
   
   const config = useMemo(() => {
-    return allConfigs[selectedDeviceId] || DEFAULT_ZONE_CONFIG;
+    return normalizeDeviceConfig(allConfigs[selectedDeviceId]);
   }, [allConfigs, selectedDeviceId]);
   
   const setConfig = useCallback((updater) => {
     setAllConfigs(prev => {
-      const currentConfig = prev[selectedDeviceId] || DEFAULT_ZONE_CONFIG;
-      const newConfig = typeof updater === 'function' ? updater(currentConfig) : updater;
+      const currentConfig = normalizeDeviceConfig(prev[selectedDeviceId]);
+      const nextConfig = typeof updater === 'function' ? updater(currentConfig) : updater;
+      const newConfig = normalizeDeviceConfig(nextConfig);
       return { ...prev, [selectedDeviceId]: newConfig };
     });
   }, [selectedDeviceId]);
@@ -305,13 +309,14 @@ export default function SoloZoneSettings({ onConfigChange, onClose, devices = []
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    onConfigChange?.(allConfigs);
+    onConfigChange?.(normalizeAllConfigs(allConfigs));
   }, []);
 
   const handleApply = () => {
     setIsSaving(true);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(allConfigs));
-    onConfigChange?.(allConfigs);
+    const normalizedConfigs = normalizeAllConfigs(allConfigs);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedConfigs));
+    onConfigChange?.(normalizedConfigs);
     setTimeout(() => setIsSaving(false), 300);
   };
 
@@ -319,8 +324,9 @@ export default function SoloZoneSettings({ onConfigChange, onClose, devices = []
     setAllConfigs(prev => {
       const newConfigs = { ...prev };
       delete newConfigs[selectedDeviceId];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfigs));
-      onConfigChange?.(newConfigs);
+      const normalizedConfigs = normalizeAllConfigs(newConfigs);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedConfigs));
+      onConfigChange?.(normalizedConfigs);
       return newConfigs;
     });
   };

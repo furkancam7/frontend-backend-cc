@@ -162,7 +162,7 @@ done
 
 log_info "Admin kullanıcısı oluşturuluyor..."
 
-ADMIN_HASH=$(docker compose exec -T postgres sh -c "apt-get update -qq && apt-get install -qq -y python3 python3-pip > /dev/null 2>&1; pip3 install -qq passlib bcrypt > /dev/null 2>&1; python3 -c \"from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt'], deprecated='auto').hash('${ADMIN_PASSWORD}'))\"" 2>/dev/null || echo "")
+ADMIN_HASH=$(docker compose exec -T postgres sh -c "apt-get update -qq && apt-get install -qq -y python3 python3-pip > /dev/null 2>&1; pip3 install -qq 'passlib[bcrypt]==1.7.4' 'bcrypt==4.0.1' > /dev/null 2>&1; python3 -c \"from passlib.context import CryptContext; print(CryptContext(schemes=['bcrypt'], deprecated='auto').hash('${ADMIN_PASSWORD}'))\"" 2>/dev/null || echo "")
 
 if [ -z "$ADMIN_HASH" ]; then
     ADMIN_HASH='$2b$12$3Tt1LFmbVAjqdIqwbNYLhutJpAMgpjLsWQPE1L6UunXb4eI4ajBwu'
